@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client/extension";
+import { PrismaClient } from "@prisma/client";
 import { pino } from "pino";
 
 const logger = pino({name: 'prismma'})

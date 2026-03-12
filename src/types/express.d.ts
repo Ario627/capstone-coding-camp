@@ -10,6 +10,11 @@ declare global {
     namespace Express {
         interface Request {
             user?: JwtPayload;
+            validated?: {
+                body?: unknown;
+                query?: Record<string, any>;
+                params?: Record<string, string | string[]>;
+            };
         }
     }
 }

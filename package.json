@@ -21,6 +21,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "crypto": "^1.0.1",
+    "decimal.js": "^10.6.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.0",
     "helmet": "^8.1.0",
@@ -30,6 +31,7 @@
     "pino": "^10.3.1",
     "rate-limit-redis": "^4.3.1",
     "typescript": "^5.9.3",
+    "uuid": "^13.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

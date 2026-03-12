@@ -7,7 +7,9 @@ let redis: Redis | undefined;
 
 export  function getRedis(): Redis {
     if(!redis) {
-        redis =  new Redis(env().REDIS_URL, {maxRetriesPerRequest: 3, retryStrategy: (t: number) => Math.min(t * 200, 3000)});
+        const url = env().REDIS_URL;
+        if (!url) throw new Error("REDIS_URL is not set (Redis is disabled)");
+        redis = new Redis(url, {maxRetriesPerRequest: 3, retryStrategy: (t: number) => Math.min(t * 200, 3000)});
 
         redis.on('connect', () => logger.info('Connected to Redis'));
         redis.on('error', (err) => logger.error({err}, 'Redis error'));

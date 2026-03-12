@@ -21,9 +21,9 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction): 
     if(h?.startsWith('Bearer ')) {
         try  {
             req.user = jwt.verify(h.slice(7), env().JWT_ACCESS_SECRET, {issuer: 'fingrow', audience: 'fingrow-client'}) as JwtPayload;
-        } catch (err) {
-            // sanfnuanujnmau
+        } catch {
+            // ignore invalid token for optional auth
         }
-        next();
     }
+    next();
 }

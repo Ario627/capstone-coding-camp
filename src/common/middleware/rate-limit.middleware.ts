@@ -2,6 +2,12 @@ import rateLimit from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
 import { getRedis } from "../../lib/redis.js";
 
+function useRedisStore(): boolean {
+    const flag = process.env.DISABLE_REDIS;
+    if (flag && flag.toLowerCase() === 'true') return false;
+    return Boolean(process.env.REDIS_URL);
+}
+
 function createRedisSendCommand() {
   return async (...args: string[]) => {
     return getRedis().call(...(args as [string, ...string[]])) as Promise<number>;
@@ -16,9 +22,9 @@ export function generalRateLimit() {
         max: 100,
         standardHeaders: true,
         legacyHeaders: false,
-        store: new RedisStore({
-            sendCommand: createRedisSendCommand(), prefix: 'rl:gen:'
-        }),
+        ...(useRedisStore()
+            ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:gen:' }) }
+            : {}),
         message: {success: false, message: 'Too many requests, please try again later.'}
     })
 }
@@ -30,9 +36,9 @@ export function loginRateLimit() {
         max: 5, 
         standardHeaders: true, 
         legacyHeaders: false,
-        store: new RedisStore({
-            sendCommand: createRedisSendCommand(), prefix: 'rl:login:'
-        }),
+        ...(useRedisStore()
+            ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:login:' }) }
+            : {}),
         message: {success: false, message: 'Too many login attempts, please try again later.'}
     })
 }
@@ -44,9 +50,9 @@ export function registrationRateLimit() {
         max: 5, 
         standardHeaders: true, 
         legacyHeaders: false,
-        store: new RedisStore({
-            sendCommand: createRedisSendCommand(), prefix: 'rl:reg:'
-        }),
+        ...(useRedisStore()
+            ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:reg:' }) }
+            : {}),
         message: {success: false, message: 'Too many registration attempts, please try again later.'}
     })
 }   
@@ -58,9 +64,9 @@ export function oauthRateLimit() {
         max: 10, 
         standardHeaders: true, 
         legacyHeaders: false,
-        store: new RedisStore({
-            sendCommand: createRedisSendCommand(), prefix: 'rl:oauth:'
-        }),
+        ...(useRedisStore()
+            ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:oauth:' }) }
+            : {}),
         message: {success: false, message: 'Too many attempts, please try again later.'}
     })
 }

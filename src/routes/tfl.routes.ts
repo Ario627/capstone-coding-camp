@@ -82,7 +82,7 @@ tflRouter.get("/chain-audit", async (req, res) => {
 
     let brokenLinks = 0;
     let invalidHashes = 0;
-    const results = transcations.map((tx, index) => {
+    const results = transcations.map((tx: typeof transcations[number], index: number) => {
         const isHashValid = verifyTflHash(tx.txHash, {
             userId: req.user!.sub,
             amount: tx.amount.toString(),

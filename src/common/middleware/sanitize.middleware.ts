@@ -6,6 +6,7 @@ export function sanitize(req: Request, _res: Response, next: NextFunction): void
     if(req.body && typeof req.body === 'object') {
         req.body = sanitizeDeep(req.body as Record<string, unknown>);
     }
+    next();
 }
 
 function stripTags(str: string): string {

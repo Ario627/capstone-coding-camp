@@ -15,6 +15,7 @@ export const envSchema = z.object({
   CSRF_SECRET: z.string().min(16).optional().default("dev-csrf-secret-change-me"),
   TFL_HASH_SECRET: z.string().min(32).optional().default("dev-tfl-hash-secret-at-least-32-characters-long"),
   PAYMENT_WEBHOOK_SECRET: z.string().min(16).optional().default("dev-webhook-secret-change"),
+  PAYMENT_ENCRYPTION_KEY: z.string().min(32).optional().default("dev-encryption-key-at-least-32-characters"),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

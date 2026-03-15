@@ -70,3 +70,27 @@ export function oauthRateLimit() {
         message: {success: false, message: 'Too many attempts, please try again later.'}
     })
 }
+
+export function paymentRateLimit() {
+    return rateLimit({
+        windowMs: 60_000,
+        max: 10,
+        standardHeaders: true,
+        legacyHeaders: false,
+        ...(useRedisStore() ? {store: new RedisStore({sendCommand: createRedisSendCommand(), prefix: 'rl:payment:'})} : {}),
+        message: {success: false, message: 'Too many payment attempts, please try again later.'}
+    })
+}
+
+export function webhookRateLimit() {
+    return rateLimit({
+        windowMs: 60_000,
+        max: 50,
+        standardHeaders: true,
+        legacyHeaders: false,
+        ...(useRedisStore()
+            ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:whk:' }) }
+            : {}),
+        message: {success: false, message: 'Too many webhook requests, please try again later.'}
+    })
+}

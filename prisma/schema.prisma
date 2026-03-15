@@ -16,26 +16,142 @@ enum UserRole {
   admin
 }
 
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  EXPIRED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  EWALLET
+  QRIS
+  VIRTUAL_ACCOUNT
+  CREDIT_CARD
+}
+
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  role         UserRole  @default(user)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  passwordHash        String
+  role                UserRole             @default(user)
+  isActive            Boolean              @default(true) @map("is_active")
+  lastLoginAt         DateTime?            @map("last_login_at")
+  loginCount          Int                  @default(0) @map("login_count")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  transactions        Transaction[]
+  RefreshToken        RefreshToken[]
+  Business            Business[]
+  paymentTransactions PaymentTransaction[]
+  AuditLog            AuditLog[]
 
   @@index([email])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  tokenHash String   @map("token_hash")
+  family    String
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([family])
+  @@map("refresh_tokens")
 }
 
 model Transaction {
-  id          String          @id @default(cuid())
-  userId      String
-  amount      Int
-  type        TransactionType
-  category    String
-  description String
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id              String          @id @default(cuid())
+  userId          String
+  amount          Int
+  type            TransactionType
+  category        String
+  description     String
+  txHash          String          @default("") @map("tx_hash")
+  previousHash    String?         @map("previous_hash")
+  isVerified      Boolean         @default(true) @map("is_verified")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?       @map("deleted_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([txHash])
+  @@index([deletedAt])
+  @@map("transactions")
+}
+model Business {
+  id          String    @id @default(cuid())
+  userID      String    @map("user_id")
+  name        String
+  type        String
+  description String?
+  address     String?
+  phone       String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  user User @relation(fields: [userID], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  before    Json?
+  after     Json?
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+//NULIS SESUAI INSTING AJA
+model PaymentTransaction {
+  id             String        @id @default(cuid())
+  userId         String        @map("user_id")
+  externalId     String        @unique @map("external_id")
+  idempotencyKey String?       @unique @map("idempotency_key")
+  amount         Decimal       @db.Decimal(18, 2)
+  currency       String        @default("IDR")
+  method         PaymentMethod
+  status         PaymentStatus @default(PENDING)
+  description    String?
+  encryptedMeta  String?       @map("encrypted_meta")
+  providerRef    String?       @map("provider_ref")
+  webhookPayload Json?         @map("webhook_payload")
+  failureReason  String?       @map("failure_reason")
+  paidAt         DateTime?     @map("paid_at")
+  expiresAt      DateTime?     @map("expires_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([externalId])
+  @@index([idempotencyKey])
+  @@index([status])
+  @@map("payment_transactions")
 }

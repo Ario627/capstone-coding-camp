@@ -7,6 +7,7 @@ import { generalRateLimit } from "./common/middleware/rate-limit.middleware.js";
 import { errorHandler } from "./common/middleware/error-handler.middleware.js";
 import { transactionsRouter } from "./routes/transactions.routes.js";
 import { authRouter } from "./routes/auth.routes.js";
+import { paymentRouter } from "./routes/payment.routes.js";
 
 export function createApp() {
   const app = express();
@@ -25,8 +26,9 @@ export function createApp() {
 
   app.get("/health", (_req, res) => res.json({ success: true }));
 
-  app.use("/api", authRouter);
-  app.use("/api", transactionsRouter);
+  app.use("/api/auth", authRouter);
+  app.use("/api/transactions", transactionsRouter);
+  app.use("/api/payments", paymentRouter);
 
   app.use(errorHandler);
   return app;

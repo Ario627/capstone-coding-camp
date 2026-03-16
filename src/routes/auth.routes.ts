@@ -20,21 +20,21 @@ function setRefreshTokenCookie(res: import("express").Response, token: string): 
   });
 }
 
-// Registration Endpoint /api/auth/register
+// Registration Endpoint /api/register
 authRouter.post("/register", registrationRateLimit(), validate({body: registerSchema}), async (req, res) => {
   const result = await authService.registerUser(req.body);
   setRefreshTokenCookie(res, result.tokens.refreshToken);
   sendCreated(res, { accessToken: result.tokens.accessToken, user: result.user});
 });
 
-// Login Endpoint /api/auth/login
+// Login Endpoint /api/login
 authRouter.post("/login", loginRateLimit(), validate({ body: loginSchema }), async (req, res) => {
   const result = await authService.loginUser(req.body);
   setRefreshTokenCookie(res, result.tokens.refreshToken);
   sendSuccess(res, { accessToken: result.tokens.accessToken, user: result.user });
 });
 
-// Refresh Token Endpoint /api/auth/refresh
+// Refresh Token Endpoint /api/refresh
 authRouter.post("/refresh", async (req, res) => {
   const rt: string | undefined = req.cookies?.[COOKIE_REFRESH_TOKEN];
   const tokens = await authService.refreshToken(rt ?? "");
@@ -42,14 +42,14 @@ authRouter.post("/refresh", async (req, res) => {
   sendSuccess(res, { accessToken: tokens.accessToken });
 });
 
-// Logout Endpoint /api/auth/logout
+// Logout Endpoint /api/logout
 authRouter.post("/logout", authMiddleware, async (req, res) => {
   await authService.logoutUser(req.user!.sub, req.cookies?.[COOKIE_REFRESH_TOKEN]);
   res.clearCookie(COOKIE_REFRESH_TOKEN, {path: "/"});
   sendSuccess(res, { message: "Logged out successfully" });
 });
 
-// Me endpoint /api/auth/me
+// Me endpoint /api/me
 authRouter.get("/me", authMiddleware, async (req, res) => {
   const user = await authService.getCurrentUser(req.user!.sub);
   sendSuccess(res, { user });

@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
-    "build": "tsc -p tsconfig.json",
-    "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm run db:generate && tsc -p tsconfig.json",
+    "db:push": "prisma db push",
+    "db:seed": "node seed-user.mjs",
+    "db:setup": "npm run db:generate && npm run db:push && npm run db:seed",
+    "test": "echo \"No tests configured\""
   },
   "keywords": [],
   "author": "",
@@ -35,8 +37,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
     "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.3.5",

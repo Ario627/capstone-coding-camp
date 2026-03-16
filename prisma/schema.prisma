@@ -47,6 +47,7 @@ model User {
   transactions        Transaction[]
   RefreshToken        RefreshToken[]
   Business            Business[]
+  inventoryItems      InventoryItem[]
   paymentTransactions PaymentTransaction[]
   AuditLog            AuditLog[]
 
@@ -72,18 +73,18 @@ model RefreshToken {
 }
 
 model Transaction {
-  id              String          @id @default(cuid())
-  userId          String
-  amount          Int
-  type            TransactionType
-  category        String
-  description     String
-  txHash          String          @default("") @map("tx_hash")
-  previousHash    String?         @map("previous_hash")
-  isVerified      Boolean         @default(true) @map("is_verified")
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  deletedAt       DateTime?       @map("deleted_at")
+  id           String          @id @default(cuid())
+  userId       String
+  amount       Int
+  type         TransactionType
+  category     String
+  description  String
+  txHash       String          @default("") @map("tx_hash")
+  previousHash String?         @map("previous_hash")
+  isVerified   Boolean         @default(true) @map("is_verified")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  deletedAt    DateTime?       @map("deleted_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -92,9 +93,10 @@ model Transaction {
   @@index([deletedAt])
   @@map("transactions")
 }
+
 model Business {
   id          String    @id @default(cuid())
-  userID      String    @map("user_id")
+  userId      String    @map("user_id")
   name        String
   type        String
   description String?
@@ -105,7 +107,33 @@ model Business {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  user User @relation(fields: [userID], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inventoryItems InventoryItem[]
+
+  @@index([userId])
+  @@map("businesses")
+}
+
+model InventoryItem {
+  id         String    @id @default(cuid())
+  businessId String    @map("business_id")
+  userId     String    @map("user_id")
+  name       String
+  sku        String?
+  quantity   Int       @default(0)
+  unitPrice  Decimal   @map("unit_price") @db.Decimal(15, 2)
+  costPrice  Decimal   @default(0) @map("cost_price") @db.Decimal(15, 2)
+  unit       String    @default("pcs")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([userId])
+  @@map("inventory_items")
 }
 
 model AuditLog {

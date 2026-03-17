@@ -16,8 +16,7 @@ function getModel() {
   return genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 }
 
-// ─── Education Chat ──────────────────────────────────────────────────────────
-
+// Education Chat 
 export async function educationChat(userId: string, dto: EducationChatInput) {
   const model = getModel();
 
@@ -48,7 +47,7 @@ ${dto.context ? `Fokus pada topik: ${dto.context}` : ""}`;
   return { reply: response, context: dto.context ?? "general" };
 }
 
-// ─── Narrative Report ────────────────────────────────────────────────────────
+// Narrative Report
 
 export async function narrativeReport(userId: string, dto: NarrativeReportInput) {
   const model = getModel();
@@ -146,7 +145,7 @@ ${txSummary}`;
   };
 }
 
-// ─── Financial Projection ────────────────────────────────────────────────────
+// Financial Projection
 
 export async function financialProjection(userId: string, dto: FinancialProjectionInput) {
   const model = getModel();
@@ -232,7 +231,7 @@ ${txSummary}`;
   };
 }
 
-// ─── Financial Analysis ──────────────────────────────────────────────────────
+// Financial Analysis
 
 export async function financialAnalysis(userId: string, dto: FinancialAnalysisInput) {
   const model = getModel();

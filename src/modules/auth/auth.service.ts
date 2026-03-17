@@ -103,6 +103,9 @@ export async function loginUser(dto: LoginInput) {
 
     if(!user.isActive) throw new AppError(403, "Account is inactive");
 
+    const valid = await argon2.verify(user.passwordHash, dto.password);
+    if(!valid) throw new AppError(400, "Invalid email or password");
+
     const tokens = generateTokenPair({sub: user.id, email: user.email, role: user.role});
     await storeRefreshToken(user.id, tokens.refreshToken, tokens.refreshFamily);
 

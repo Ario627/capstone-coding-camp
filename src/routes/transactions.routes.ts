@@ -4,6 +4,7 @@ import { authMiddleware } from "../common/middleware/auth.middleware.js";
 import { validate } from "../common/middleware/validate.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../common/middleware/error-handler.middleware.js";
+import { sendSuccess, sendCreated } from "../common/utils/response.util.js";
 import { PAGINATION_DEFAULTS } from "../common/constants/index.js";
 
 export const transactionsRouter = Router();
@@ -16,6 +17,8 @@ const transactionCreateBody = z
     description: z.string().trim().min(1).max(500),
   })
   .strict();
+
+const transactionUpdateBody = transactionCreateBody.partial();
 
 const transactionListQuery = z
   .object({
@@ -30,8 +33,11 @@ const transactionListQuery = z
   })
   .strict();
 
+const idParam = z.object({ id: z.string().min(1) });
+
+// GET /api/transactions
 transactionsRouter.get(
-  "/transactions",
+  "/",
   authMiddleware,
   validate({ query: transactionListQuery }),
   async (req, res) => {
@@ -43,9 +49,9 @@ transactionsRouter.get(
     const skip = (page - 1) * limit;
 
     const [total, items] = await Promise.all([
-      prisma.transaction.count({ where: { userId: req.user.sub } }),
+      prisma.transaction.count({ where: { userId: req.user.sub, deletedAt: null } }),
       prisma.transaction.findMany({
-        where: { userId: req.user.sub },
+        where: { userId: req.user.sub, deletedAt: null },
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
@@ -72,8 +78,33 @@ transactionsRouter.get(
   },
 );
 
+// GET /api/transactions/summary
+transactionsRouter.get("/summary", authMiddleware, async (req, res) => {
+  if (!req.user) throw new AppError(401, "Unauthorized");
+
+  const transactions = await prisma.transaction.findMany({
+    where: { userId: req.user.sub, deletedAt: null },
+    select: { amount: true, type: true },
+  });
+
+  let totalIncome = 0;
+  let totalExpense = 0;
+  for (const tx of transactions) {
+    if (tx.type === "income") totalIncome += tx.amount;
+    else totalExpense += tx.amount;
+  }
+
+  sendSuccess(res, {
+    totalIncome,
+    totalExpense,
+    balance: totalIncome - totalExpense,
+    transactionCount: transactions.length,
+  });
+});
+
+// POST /api/transactions
 transactionsRouter.post(
-  "/transactions",
+  "/",
   authMiddleware,
   validate({ body: transactionCreateBody }),
   async (req, res) => {
@@ -103,3 +134,62 @@ transactionsRouter.post(
   },
 );
 
+// PATCH /api/transactions/:id
+transactionsRouter.patch(
+  "/:id",
+  authMiddleware,
+  validate({ params: idParam, body: transactionUpdateBody }),
+  async (req, res) => {
+    if (!req.user) throw new AppError(401, "Unauthorized");
+
+    const existing = await prisma.transaction.findFirst({
+      where: { id: req.params.id as string, userId: req.user.sub, deletedAt: null },
+    });
+    if (!existing) throw new AppError(404, "Transaction not found");
+
+    const body = req.body as z.infer<typeof transactionUpdateBody>;
+    const data: Record<string, unknown> = {};
+    if (body.amount !== undefined) data.amount = body.amount;
+    if (body.type !== undefined) data.type = body.type;
+    if (body.category !== undefined) data.category = body.category;
+    if (body.description !== undefined) data.description = body.description;
+
+    const updated = await prisma.transaction.update({
+      where: { id: existing.id },
+      data,
+      select: {
+        id: true,
+        amount: true,
+        type: true,
+        category: true,
+        description: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    sendSuccess(res, updated);
+  },
+);
+
+// DELETE /api/transactions/:id (soft delete)
+transactionsRouter.delete(
+  "/:id",
+  authMiddleware,
+  validate({ params: idParam }),
+  async (req, res) => {
+    if (!req.user) throw new AppError(401, "Unauthorized");
+
+    const existing = await prisma.transaction.findFirst({
+      where: { id: req.params.id as string, userId: req.user.sub, deletedAt: null },
+    });
+    if (!existing) throw new AppError(404, "Transaction not found");
+
+    await prisma.transaction.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date() },
+    });
+
+    sendSuccess(res, { message: "Transaction deleted" });
+  },
+);

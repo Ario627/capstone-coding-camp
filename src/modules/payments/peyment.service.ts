@@ -9,13 +9,35 @@ import type { PaymentStatus, Prisma } from "@prisma/client";
 
 
 export async function initiatePayment(userId: string, dto: InitiatePaymentInput) {
-  const external = `fg_pay_${uuidv4().replace(/-/g, "").slice(0, 20)}`; //JUJUR BINGUNG INI NULIS APAAN WKWKWWK
+
+  if (dto.idempotencyKey) {
+    const existing = await prisma.paymentTransaction.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+    });
+    if (existing) {
+      if (existing.userId !== userId) {
+        throw new AppError(409, "Idempotency key conflict");
+      }
+      return {
+        paymentId: existing.id,
+        external: existing.externalId,
+        amount: existing.amount,
+        method: existing.method,
+        status: existing.status,
+        expiresAt: existing.expiresAt,
+        idempotent: true,
+      };
+    }
+  }
+
+  const external = `fg_pay_${uuidv4().replace(/-/g, "").slice(0, 20)}`;
   const amount = new Decimal(dto.amount).toFixed(2);
 
   const payment = await prisma.paymentTransaction.create({
     data: {
       userId,
       externalId: external,
+      idempotencyKey: dto.idempotencyKey,
       amount,
       method: dto.method,
       description: dto.description ?? null,
@@ -127,6 +149,6 @@ export async function getPayment(userId: string, paymentId: string) {
   const payment = await prisma.paymentTransaction.findFirst({
     where: { id: paymentId, userId },
   });
-  if (!payment) throw new AppError(404, "Payment tidak ditemukan");
+  if (!payment) throw new AppError(404, "Payment not found");
   return payment;
 }

@@ -3,7 +3,7 @@ import { AppError } from "../../common/middleware/error-handler.middleware.js";
 import { generateWithFallback, estimateToken } from "../ai/ai.provider.js";
 import { EDUCATION_SYSTEM_PROMPT, EDUCATION_CHAT_DEFAULTS, USER_DISPLAY_LABELS } from './education.constant.js';
 import type { UserDisplayType } from './education.constant.js';
-import type { EducationContext } from "../ai/ai.types.js";
+import type { EducationChatOutput, EducationContext } from "../ai/ai.types.js";
 import type {
     UserContext,
     TerminologyOutput,
@@ -13,7 +13,8 @@ import type {
     LearningModuleDetailOutput,
     LearningModuleOutput
 } from './education.types.js';
-import type { getUserDisplayType } from './education.types.js';
+import { getUserDisplayType } from './education.types.js';
+import { exactOptional } from "zod";
 
 async function buildUserContext(userId: string): Promise<UserContext> {
     const [user, businessCount, threeMonthsAgo] = await Promise.all([
@@ -89,4 +90,130 @@ async function buildUserContext(userId: string): Promise<UserContext> {
   };
 }
 
+
+function formatUserContextForPrompt(userContext: UserContext): string {
+  const displayType = getUserDisplayType(userContext.userType, userContext.hasBusiness);
+  const displayLabel = USER_DISPLAY_LABELS[displayType];
+  
+  const balanceLabel = userContext.balanceSummary.balance >= 0 ? 'Surplus' : 'Defisit';
+  const balanceSign = userContext.balanceSummary.balance >= 0 ? '' : '';
+
+  const formatted = userContext.recentTransactions.length > 0 ? userContext.recentTransactions.map((t) => {
+    const sign = t.type === 'income' ? '+' : '-';
+    const amount = `${sign}${t.amount.toLocaleString('id-ID')}`;
+    return `  - ${amount} | ${t.category} | ${t.description}`;
+  }).join('\n') : '  (Tidak ada transaksi dalam 3 bulan terakhir)';
+
+   return `## USER PROFILE
+- Tipe Pengguna: ${displayLabel}
+- Ringkasan Saldo (${userContext.balanceSummary.period}):
+  - Total Pemasukan: Rp ${userContext.balanceSummary.totalIncome.toLocaleString('id-ID')}
+  - Total Pengeluaran: Rp ${userContext.balanceSummary.totalExpense.toLocaleString('id-ID')}
+  - ${balanceLabel}: ${balanceSign}Rp ${Math.abs(userContext.balanceSummary.balance).toLocaleString('id-ID')}
+  - Rasio Tabungan: ${userContext.balanceSummary.savingsRate.toFixed(1)}%
+- Status Bisnis: ${userContext.hasBusiness ? 'Memiliki usaha UMKM' : 'Tidak memiliki usaha'}
+- Transaksi Terakhir (10 terbaru):
+${formatted}`;
+}
+
+function buildSystemPrompt(userContext: UserContext): string {
+  const formattedContext = formatUserContextForPrompt(userContext);
+  return EDUCATION_SYSTEM_PROMPT.replace('{{USER_CONTEXT}}', formattedContext);
+}
+
+export async function educationChat(userId: string, input: {message: string; context?: EducationContext;}): Promise<EducationChatOutput> {
+  if(input.message.length > EDUCATION_CHAT_DEFAULTS.MAX_MESSAGE_LENGTH) {
+    throw new AppError(400, `Message too long (max ${EDUCATION_CHAT_DEFAULTS.MAX_MESSAGE_LENGTH} characters)`);
+  }
+
+  const userContext = await buildUserContext(userId);
+  const systemPrompt = buildSystemPrompt(userContext);
+
+  const result = await generateWithFallback({
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: input.message },
+    ],
+    temperature: EDUCATION_CHAT_DEFAULTS.TEMPERATURE,
+    maxOutputTokens: EDUCATION_CHAT_DEFAULTS.MAX_OUTPUT_TOKENS,
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: 'AI_EDUCATION_CHAT',
+      entity: 'AI',
+      entityId: null,
+      after: {
+        ctx: input.context ?? 'general',
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        provider: result.provider,
+      } as object,
+    },
+  });
+
+  return {
+    reply: result.text,
+    conversationId: `edu_${Date.now()}_${userId.slice(0, 8)}`, // Generate conversation ID
+    context: input.context ?? 'general',
+    tokens: {
+      input: result.inputTokens,
+      output: result.outputTokens,
+      total: result.inputTokens + result.outputTokens,
+    },
+    provider: result.provider,
+    cached:  false,
+  };
+}
+
+
+export async function getDailyTip(
+  userId: string,
+  input?: { category?: string }
+): Promise<DailyTipOutput | null> {
+  const whereC: Record<string, unknown> = {isActive: true};
+  if(input?.category) {
+    whereC.category = input.category;
+  }
+
+  const tip = await prisma.$queryRaw<Array<{ id: string; title: string; content: string; category: string }>>`
+    SELECT id, title, content, category 
+    FROM daily_tips 
+    WHERE is_active = true 
+    ${input?.category ? prisma.$queryRaw`AND category = ${input.category}` : prisma.$queryRaw``}
+    ORDER BY RANDOM() 
+    LIMIT 1
+  `;
+
+  if (!tip || tip.length === 0) {
+    return null;
+  }
+
+  const selectedTip = tip[0];
+  if (!selectedTip) {
+    return null;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const existingRead = await prisma.userDailyTip.findUnique({
+    where: {
+      userId_tipId: {
+        userId,
+        tipId: selectedTip.id,
+      },
+    },
+  });
+
+  return {
+    id: selectedTip.id,
+    title: selectedTip.title,
+    content: selectedTip.content,
+    category: selectedTip.category,
+    isRead: !!existingRead,
+    readAt: existingRead?.readAt ?? null,
+  };
+}
 

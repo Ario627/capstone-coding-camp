@@ -51,6 +51,14 @@ model User {
   paymentTransactions PaymentTransaction[]
   AuditLog            AuditLog[]
 
+  aiUsages            AIUsage[]
+  aiQuota             AIQuota?
+  aiConversations     AIConversation[]
+  moduleReads         UserModuleRead[]
+  dailyTips           UserDailyTip[]
+  achievements        UserAchievement[]
+  streak              UserStreak?
+
   @@index([email])
   @@map("users")
 }
@@ -156,7 +164,8 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-//NULIS SESUAI INSTING AJA
+
+
 model PaymentTransaction {
   id             String        @id @default(cuid())
   userId         String        @map("user_id")
@@ -184,3 +193,201 @@ model PaymentTransaction {
   @@index([status])
   @@map("payment_transactions")
 }
+
+
+model AIUsage {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  cost         Decimal  @default(0) @db.Decimal(10, 6)
+  cached       Boolean  @default(false)
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, endpoint])
+  @@index([createdAt])
+  @@map("ai_usages")
+}
+
+model AIQuota {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monthlyLimit  Int      @default(100)
+  dailyLimit    Int      @default(20)
+  usedThisMonth Int      @default(0)
+  usedToday     Int      @default(0)
+  monthResetAt  DateTime
+  dailyResetAt  DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@map("ai_quotas")
+}
+
+model AIConversation {
+  id        String                   @id @default(cuid())
+  userId    String
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  context   String?                  @db.Text
+  summary   String?                  @db.Text
+  isActive  Boolean                  @default(true)
+  messages  AIConversationMessage[]
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@map("ai_conversations")
+}
+
+model AIConversationMessage {
+  id             String          @id @default(cuid())
+  conversationId String
+  conversation   AIConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String          @db.Text
+  tokens         Int             @default(0)
+  model          String?
+  createdAt      DateTime        @default(now())
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+  @@map("ai_conversation_messages")
+}
+
+
+model LearningModule {
+  id           String   @id @default(cuid())
+  title        String
+  slug         String   @unique
+  description  String?  @db.Text
+  category     String
+  difficulty   String   @default("beginner")
+  content      String   @db.Text
+  videoUrl     String?
+  thumbnailUrl String?
+  duration     Int      @default(0)
+  order        Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reads UserModuleRead[]
+
+  @@index([category])
+  @@index([order])
+  @@index([isActive])
+  @@map("learning_modules")
+}
+
+model UserModuleRead {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId  String
+  module    LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  isRead    Boolean       @default(false)
+  readAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@unique([userId, moduleId])
+  @@index([userId])
+  @@index([moduleId])
+  @@map("user_module_reads")
+}
+
+model DailyTip {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @db.Text
+  category  String
+  createdAt DateTime @default(now())
+  isActive  Boolean  @default(true)
+
+  userTips UserDailyTip[]
+
+  @@index([category, createdAt])
+  @@map("daily_tips")
+}
+
+model UserDailyTip {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tipId     String
+  tip       DailyTip @relation(fields: [tipId], references: [id], onDelete: Cascade)
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, tipId])
+  @@index([userId, createdAt])
+  @@map("user_daily_tips")
+}
+
+model Terminology {
+  id           String   @id @default(cuid())
+  term         String   @unique
+  slug         String   @unique
+  definition   String   @db.Text
+  category     String
+  examples     Json?
+  relatedTerms String[]
+  createdAt    DateTime @default(now())
+
+  @@index([category])
+  @@map("terminologies")
+}
+
+model UserStreak {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak Int       @default(0)
+  longestStreak Int       @default(0)
+  lastReadAt    DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("user_streaks")
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  title       String
+  description String   @db.Text
+  icon        String?
+  category    String
+  requirement Json
+  points      Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  userAchievements UserAchievement[]
+
+  @@index([category])
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  earnedAt      DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
+  @@map("user_achievements")
+}
+

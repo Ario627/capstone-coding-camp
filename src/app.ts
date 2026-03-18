@@ -10,6 +10,8 @@ import { transactionsRouter } from "./routes/transactions.routes.js";
 import { paymentRouter } from "./routes/payment.routes.js";
 import { umkmRouter } from "./routes/umkm.routes.js";
 import { tflRouter } from "./routes/tfl.routes.js";
+import { educationRouter } from "./routes/education.routes.js";
+import { aiRouter } from "./routes/ai.routes.js";
 
 export function createApp() {
   const app = express();
@@ -33,6 +35,8 @@ export function createApp() {
   app.use("/api/payments", paymentRouter);
   app.use("/api", umkmRouter);
   app.use("/api/tfl", tflRouter);
+  app.use("/api/education", educationRouter);
+  app.use("/api/ai", aiRouter);
 
   app.use(errorHandler);
   return app;

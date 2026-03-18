@@ -16,6 +16,7 @@ export const envSchema = z.object({
   TFL_HASH_SECRET: z.string().min(32).optional().default("dev-tfl-hash-secret-at-least-32-characters-long"),
   PAYMENT_WEBHOOK_SECRET: z.string().min(16).optional().default("dev-webhook-secret-change"),
   PAYMENT_ENCRYPTION_KEY: z.string().min(32).optional().default("dev-encryption-key-at-least-32-characters"),
+  GEMINI_API_KEY: z.string().min(10).optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

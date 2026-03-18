@@ -1,16 +1,5 @@
 import { z } from "zod";
 
-export const educationChatSchema = z
-  .object({
-    message: z
-      .string()
-      .trim()
-      .min(1, "Message is required")
-      .max(2000, "Message too long"),
-    context: z.enum(["general", "saving", "investing", "budgeting", "debt", "tax", "umkm"]).optional(),
-  })
-  .strict();
-
 export const narrativeReportSchema = z
   .object({
     period: z.enum(["weekly", "monthly", "yearly"]).default("monthly"),
@@ -29,7 +18,48 @@ export const financialAnalysisSchema = z
   })
   .strict();
 
-export type EducationChatInput = z.infer<typeof educationChatSchema>;
+export const budgetOptimizationSchema = z
+  .object({
+    monthlyIncome: z.coerce.number().positive().optional(),
+    savingsGoal: z.string().optional(),
+    currency: z.enum(["IDR", "USD"]).default("IDR"),
+  })
+  .strict();
+
+export const anomalyDetectionSchema = z
+  .object({
+    period: z.enum(["weekly", "monthly", "yearly"]).default("monthly"),
+    sensitivity: z.enum(["low", "medium", "high"]).default("medium"),
+  })
+  .strict();
+
+export const smartCategorizationSchema = z
+  .object({
+    description: z.string().trim().min(1, "Description is required"),
+    amount: z.coerce.number().positive().optional(),
+    vendor: z.string().optional(),
+  })
+  .strict();
+
+export const goalRecommendationSchema = z
+  .object({
+    goalType: z.enum(["emergency_fund", "savings", "investment", "debt_payoff", "purchase", "general"]).optional(),
+    timeframe: z.enum(["short", "medium", "long", "flexible"]).optional(),
+  })
+  .strict();
+
+export const spendingInsightsSchema = z
+  .object({
+    depth: z.enum(["basic", "standard", "deep"]).default("standard"),
+    focus: z.enum(["all", "category", "time", "behavior"]).default("all"),
+  })
+  .strict();
+
 export type NarrativeReportInput = z.infer<typeof narrativeReportSchema>;
 export type FinancialProjectionInput = z.infer<typeof financialProjectionSchema>;
 export type FinancialAnalysisInput = z.infer<typeof financialAnalysisSchema>;
+export type BudgetOptimizationInput = z.infer<typeof budgetOptimizationSchema>;
+export type AnomalyDetectionInput = z.infer<typeof anomalyDetectionSchema>;
+export type SmartCategorizationInput = z.infer<typeof smartCategorizationSchema>;
+export type GoalRecommendationInput = z.infer<typeof goalRecommendationSchema>;
+export type SpendingInsightsInput = z.infer<typeof spendingInsightsSchema>;

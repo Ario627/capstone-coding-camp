@@ -217,3 +217,84 @@ export async function getDailyTip(
   };
 }
 
+export async function markDailyTipRead(userId: string, tipId: string): Promise<{ success: boolean }> {
+  const tip = await prisma.dailyTip.findUnique({ where: { id: tipId } });
+
+  if(!tip) throw new AppError(404, "Daily tip not found");
+
+  await prisma.userDailyTip.upsert({
+    where: {
+      userId_tipId: {
+        userId,
+        tipId,
+      },
+    },
+    update: {
+      isRead: true,
+      readAt: new Date(),
+    },
+
+    create: {
+      userId,
+      tipId,
+      isRead: true,
+      readAt: new Date(),
+    },
+  });
+
+  return { success: true };
+}
+
+export async function listLearningModules(
+  input: {
+    category?: string;
+    difficulty?: string;
+    page?: number;
+    limit?: number;
+  } = {}
+): Promise<{ modules: LearningModuleOutput[]; total: number; page: number; limit: number }> {
+  const page = input.page ?? 1;
+  const limit = input.limit ?? 10;
+  const skip = (page - 1) * limit;
+
+  const whereClause: Record<string, unknown> = { isActive: true };
+  if (input.category) {
+    whereClause.category = input.category;
+  }
+  if (input.difficulty) {
+    whereClause.difficulty = input.difficulty;
+  }
+
+  const [modules, total] = await Promise.all([
+    prisma.learningModule.findMany({
+      where: whereClause,
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        description: true,
+        category: true,
+        difficulty: true,
+        duration: true,
+        videoUrl: true,
+        thumbnailUrl: true,
+        order: true,
+      },
+    }),
+    prisma.learningModule.count({ where: whereClause }),
+  ]);
+
+  return {
+    modules: modules.map((m) => ({
+      ...m,
+      isRead: false,
+      readAt: null,
+    })),
+    total,
+    page,
+    limit,
+  };
+}

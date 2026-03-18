@@ -334,11 +334,6 @@ export async function budgetOptimization(userId: string, dto: BudgetOptimization
     select: { amount: true, type: true, category: true, createdAt: true },
   });
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { monthlyIncome: true, financialGoal: true },
-  });
-
   let totalIncome = 0;
   let totalExpense = 0;
   const monthlyExpenses: Record<string, number> = {};
@@ -359,7 +354,7 @@ export async function budgetOptimization(userId: string, dto: BudgetOptimization
     ? Object.values(monthlyExpenses).reduce((a, b) => a + b, 0) / Object.keys(monthlyExpenses).length
     : 0;
 
-  const income = dto.monthlyIncome || user?.monthlyIncome || avgMonthlyExpense * 1.2;
+  const income = dto.monthlyIncome || Math.max(avgMonthlyExpense * 1.2, totalIncome / 6);
 
   const data = JSON.stringify({
     monthlyIncome: income,
@@ -368,7 +363,7 @@ export async function budgetOptimization(userId: string, dto: BudgetOptimization
     topExpenseCategories: Object.entries(categoryTotals)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5),
-    savingsGoal: dto.savingsGoal || user?.financialGoal,
+    savingsGoal: dto.savingsGoal,
     currency: dto.currency || "IDR",
   });
 
@@ -608,20 +603,14 @@ export async function goalRecommendation(userId: string, dto: GoalRecommendation
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  const [transactions, existingGoals] = await Promise.all([
-    prisma.transaction.findMany({
-      where: {
-        userId,
-        deletedAt: null,
-        createdAt: { gte: sixMonthsAgo },
-      },
-      select: { amount: true, type: true, category: true, createdAt: true },
-    }),
-    prisma.goal.findMany({
-      where: { userId, status: { in: ["active", "pending"] } },
-      select: { title: true, targetAmount: true, deadline: true },
-    }),
-  ]);
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      userId,
+      deletedAt: null,
+      createdAt: { gte: sixMonthsAgo },
+    },
+    select: { amount: true, type: true, category: true, createdAt: true },
+  });
 
   let totalIncome = 0;
   let totalExpense = 0;
@@ -647,7 +636,6 @@ export async function goalRecommendation(userId: string, dto: GoalRecommendation
   const data = JSON.stringify({
     avgMonthlyIncome,
     avgMonthlySavings: Math.max(avgMonthlySavings, 0),
-    currentGoals: existingGoals.length,
     savingsRate: avgMonthlyIncome > 0 ? ((avgMonthlySavings / avgMonthlyIncome) * 100).toFixed(1) : 0,
     goalType: dto.goalType || "general",
     timeframe: dto.timeframe || "flexible",
@@ -690,7 +678,7 @@ ${data}`;
     financialSnapshot: {
       avgMonthlyIncome,
       avgMonthlySavings: Math.max(avgMonthlySavings, 0),
-      currentGoalCount: existingGoals.length,
+      currentGoalCount: 0,
       savingsRate: avgMonthlyIncome > 0 ? Number(((avgMonthlySavings / avgMonthlyIncome) * 100).toFixed(1)) : 0,
     },
   };

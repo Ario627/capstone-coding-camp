@@ -89,3 +89,99 @@ export const MODULE_DIFFICULTY_LABELS: Record<string, string> = {
   intermediate: 'Menengah',
   advanced: 'Lanjutan',
 };
+
+
+export const MODULE_CATEGORIES = [
+  'financial_basics',
+  'budgeting',
+  'saving',
+  'investing',
+  'debt_management',
+  'umkm_finance',
+  'tax_basics',
+  'digital_finance',
+] as const;
+
+export type ModuleCategory = typeof MODULE_CATEGORIES[number];
+
+export const MODULE_CATEGORY_LABELS: Record<string, string> = {
+  financial_basics: 'Dasar Keuangan',
+  budgeting: 'Pengelolaan Anggaran',
+  saving: 'Menabung',
+  investing: 'Investasi',
+  debt_management: 'Manajemen Utang',
+  umkm_finance: 'Keuangan UMKM',
+  tax_basics: 'Dasar Pajak',
+  digital_finance: 'Keuangan Digital',
+};
+
+
+
+export const TERMINOLOGY_CATEGORIES = [
+  'general',
+  'investment',
+  'banking',
+  'tax',
+  'insurance',
+  'umkm',
+] as const;
+
+export type TerminologyCategory = typeof TERMINOLOGY_CATEGORIES[number];
+
+export const TERMINOLOGY_CATEGORY_LABELS: Record<string, string> = {
+  general: 'Umum',
+  investment: 'Investasi',
+  banking: 'Perbankan',
+  tax: 'Pajak',
+  insurance: 'Asuransi',
+  umkm: 'UMKM',
+};
+
+export const USER_TYPE_LABELS: Record<string, string> = {
+  user: 'Pengguna',
+  admin: 'Administrator',
+};
+
+export const USER_TYPE_WITH_BUSINESS_LABELS: Record<string, string> = {
+  user_no_business: 'Pengguna Personal',
+  user_with_business: 'Pengguna UMKM',
+  admin: 'Administrator',
+};
+
+export type UserDisplayType = 'user_personal' | 'user_umkm' | 'admin';
+
+export const USER_DISPLAY_LABELS: Record<UserDisplayType, string> = {
+  user_personal: 'Pengguna Personal',
+  user_umkm: 'Pengguna UMKM',
+  admin: 'Administrator',
+};
+
+export const EDUCATION_RATE_LIMITS = {
+  CHAT_DAILY_LIMIT: 30,
+  CHAT_MONTHLY_LIMIT: 100,
+  MODULE_READ_DAILY_LIMIT: 50,
+} as const;
+
+export const EDUCATION_CACHE_TTL = {
+  DAILY_TIP: 3600,        // 1 jam
+  MODULE_LIST: 1800,      // 30 menit
+  MODULE_DETAIL: 3600,    // 1 jam
+  TERMINOLOGY: 86400,     // 24 jam ygy
+} as const;
+
+
+export const CONTEXT_INJECTION_PLACEHOLDERS = {
+  USER_CONTEXT: '{{USER_CONTEXT}}',
+  USER_TYPE: '{{user_type}}',
+  BALANCE_SUMMARY: '{{balance_summary}}',
+  RECENT_TRANSACTIONS: '{{recent_transactions}}',
+} as const;
+
+
+export const EDUCATION_CHAT_DEFAULTS = {
+  CONTEXT: 'general',
+  MAX_MESSAGE_LENGTH: 2000,
+  MAX_HISTORY_MESSAGES: 10,
+  TEMPERATURE: 0.7,
+  MAX_OUTPUT_TOKENS: 1500,
+} as const;

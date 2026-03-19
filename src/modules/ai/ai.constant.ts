@@ -21,10 +21,6 @@ export const AI_RATE_LIMITS = {
   ANALYSIS_MONTHLY_LIMIT: 30,
 } as const;
 
-// ============================================
-// AI TOKEN LIMITS
-// ============================================
-
 export const AI_TOKEN_LIMITS = {
   MAX_INPUT_TOKENS: 4000,
   MAX_OUTPUT_TOKENS: 2000,

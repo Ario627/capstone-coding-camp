@@ -1,7 +1,3 @@
-// ============================================
-// AI PROVIDER TYPES
-// ============================================
-
 export type AIProviderType = 'groq' | 'gemini';
 export type EducationContext = 'general' | 'saving' | 'investing' | 'budgeting' | 'debt' | 'tax' | 'umkm';
 export type PeriodType = 'weekly' | 'monthly' | 'yearly';
@@ -581,10 +577,6 @@ export interface ParsedExcel {
   }>;
   totalRows: number;
 }
-
-// ============================================
-// QUOTA MANAGEMENT TYPES
-// ============================================
 
 export interface QuotaCheck {
   allowed: boolean;

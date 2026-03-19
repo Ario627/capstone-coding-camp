@@ -1,4 +1,6 @@
-
+// ============================================
+// AI PROVIDER TYPES
+// ============================================
 
 export type AIProviderType = 'groq' | 'gemini';
 export type EducationContext = 'general' | 'saving' | 'investing' | 'budgeting' | 'debt' | 'tax' | 'umkm';
@@ -9,8 +11,6 @@ export type GoalType = 'emergency_fund' | 'savings' | 'investment' | 'debt_payof
 export type TimeframeType = 'short' | 'medium' | 'long' | 'flexible';
 export type SensitivityLevel = 'low' | 'medium' | 'high';
 export type CurrencyType = 'IDR' | 'USD';
-
-//conversation
 
 export interface ConversationMessage {
   role: 'user' | 'assistant' | 'system';
@@ -25,7 +25,6 @@ export interface ConversationContext {
   messages: ConversationMessage[];
 }
 
-// EDUCATION CHAT TYPES NYA 
 
 export interface EducationChatInput {
   message: string;
@@ -46,11 +45,10 @@ export interface EducationChatOutput {
   cached: boolean;
 }
 
-// USER CONTEXT nya 
 
-export interface UserContext {
-  userType: 'user' | 'admin';       
-  hasBusiness: boolean;             
+export interface UserContext { // USER CONTEXT TYPES
+  userType: 'user' | 'admin';
+  hasBusiness: boolean;
   balanceSummary: {
     totalIncome: number;
     totalExpense: number;
@@ -68,10 +66,9 @@ export interface UserContext {
   }>;
 }
 
-// --- IGNORE ---
 
 export interface NarrativeReportInput {
-  period: PeriodType;
+  period: PeriodType;// AI SERVICE INPUT/OUTPUT
 }
 
 export interface NarrativeReportOutput {
@@ -208,7 +205,6 @@ export interface SpendingInsightsOutput {
   };
 }
 
-
 export interface FinancialHealthInput {
   period?: PeriodType;
 }
@@ -309,7 +305,6 @@ export interface DebtStrategyOutput {
   strategyName: string;
   strategyDescription: string;
   totalDebt: number;
-
   totalInterest: number;
   monthsToPayoff: number;
   paymentPlan: Array<{
@@ -324,8 +319,7 @@ export interface DebtStrategyOutput {
   recommendations: string[];
 }
 
-
-export interface QuotaStatus {
+export interface QuotaStatus {        // QUOTA 
   monthly: {
     limit: number;
     used: number;
@@ -370,7 +364,6 @@ export interface UsageStats {
   };
 }
 
-
 export interface ProviderGenerateResult {
   text: string;
   inputTokens: number;
@@ -383,4 +376,288 @@ export interface ProviderStatus {
   groq: boolean;
   gemini: boolean;
   primary: 'groq' | 'gemini' | 'none';
+}
+
+export type ConsultantContext = 'general' | 'budget' | 'investment' | 'debt' | 'business';
+
+export type DocumentType = 'bank_statement' | 'invoice' | 'receipt' | 'financial_report' | 'unknown';
+
+
+
+export interface ConsultantChatInput {
+  message: string;
+  conversationId?: string;
+  context?: ConsultantContext;
+}
+
+export interface ConsultantChatOutput {
+  reply: string;
+  conversationId: string;
+  context: ConsultantContext;
+  tokens: {
+    input: number;
+    output: number;
+    total: number;
+  };
+  provider: AIProviderType;
+  quotaRemaining: {
+    daily: number;
+    monthly: number;
+  };
+}
+
+export interface ConsultantFileChatInput extends ConsultantChatInput {
+  fileBuffer: Buffer;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+}
+
+export interface ConsultantFileChatOutput extends ConsultantChatOutput {
+  documentContext: {
+    fileName: string;
+    fileType: 'pdf' | 'excel';
+    detectedType: DocumentType;
+    summary: string;
+  };
+}
+
+export interface ConsultantConversation {
+  id: string;
+  userId: string;
+  context: ConsultantContext | null;
+  summary: string | null;
+  isActive: boolean;
+  messageCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ConsultantConversationDetail extends ConsultantConversation {
+  messages: ConsultantMessage[];
+}
+
+export interface ConsultantMessage {
+  id: string;
+  conversationId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  tokens: number;
+  model: string | null;
+  createdAt: Date;
+}
+
+export interface ConsultantConversationListInput {
+  page?: number;
+  limit?: number;
+  isActive?: boolean;
+}
+
+export interface ConsultantConversationListOutput {
+  conversations: ConsultantConversation[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+
+// USER FINANCIAL CONTEXT TYPES
+
+export interface UserProfile {
+  userType: 'personal' | 'umkm' | 'admin';
+  joinedAt: Date;
+  hasBusiness: boolean;
+  streakDays: number;
+}
+
+export interface FinancialSummary {
+  period: string;
+  totalIncome: number;
+  totalExpense: number;
+  balance: number;
+  savingsRate: number;
+  transactionCount: number;
+}
+
+export interface CategoryBreakdown {
+  category: string;
+  amount: number;
+  percentage: number;
+  count: number;
+}
+
+export interface MonthlyTrend {
+  month: string;
+  income: number;
+  expense: number;
+  balance: number;
+}
+
+export interface RecentTransaction {
+  date: Date;
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
+  description: string;
+}
+
+export interface PaymentSummary {
+  totalPayments: number;
+  totalAmount: number;
+  successRate: number;
+  preferredMethod: string;
+  methods: Array<{
+    method: string;
+    count: number;
+    total: number;
+  }>;
+}
+
+export interface BusinessData {
+  name: string;
+  type: string;
+  description?: string;
+  inventoryCount?: number;
+  inventoryValue?: number;
+}
+
+export interface EducationProgress {
+  modulesCompleted: number;
+  totalModules: number;
+  lastActivity: Date | null;
+  streakDays: number;
+}
+
+export interface UserFinancialContext {
+  profile: UserProfile;
+  financialSummary: FinancialSummary;
+  categoryBreakdown: {
+    income: CategoryBreakdown[];
+    expense: CategoryBreakdown[];
+  };
+  monthlyTrend: MonthlyTrend[];
+  recentTransactions: RecentTransaction[];
+  paymentSummary?: PaymentSummary;
+  businessData?: BusinessData;
+  educationProgress: EducationProgress;
+}
+
+
+export interface DocumentContext {
+  fileName: string;
+  fileType: 'pdf' | 'excel';
+  detectedType: DocumentType;
+  extractedContent: string;
+  summary: {
+    pagesOrRows: number;
+    dateRange?: {
+      start: Date;
+      end: Date;
+    };
+    totalAmounts?: Array<{
+      label: string;
+      amount: number;
+    }>;
+    keywords?: string[];
+  };
+}
+
+export interface ParsedPDF {
+  text: string;
+  pages: number;
+  metadata?: {
+    title?: string;
+    author?: string;
+    creationDate?: Date;
+  };
+}
+
+export interface ParsedExcel {
+  sheets: Array<{
+    name: string;
+    rows: number;
+    columns: string[];
+    data: Record<string, unknown>[];
+  }>;
+  totalRows: number;
+}
+
+// ============================================
+// QUOTA MANAGEMENT TYPES
+// ============================================
+
+export interface QuotaCheck {
+  allowed: boolean;
+  reason?: 'daily_exhausted' | 'monthly_exhausted';
+  remaining: {
+    daily: number;
+    monthly: number;
+  };
+}
+
+export interface QuotaUpdate {
+  dailyUsed: number;
+  monthlyUsed: number;
+  dailyResetAt: Date;
+  monthlyResetAt: Date;
+}
+
+
+export interface ConsultantErrorResponse {    // ERROR RESPONSE TYPES
+  success: false;
+  message: string;
+  code: ConsultantErrorCode;
+  data?: Record<string, unknown>;
+}
+
+export type ConsultantErrorCode =
+  | 'QUOTA_EXHAUSTED_DAILY'
+  | 'QUOTA_EXHAUSTED_MONTHLY'
+  | 'RATE_LIMIT_EXCEEDED'
+  | 'TOKEN_BUDGET_EXCEEDED'
+  | 'FILE_TOO_LARGE'
+  | 'INVALID_FILE_TYPE'
+  | 'FILE_PARSE_ERROR'
+  | 'CONVERSATION_NOT_FOUND'
+  | 'CONVERSATION_ACCESS_DENIED'
+  | 'CONVERSATION_LIMIT_EXCEEDED'
+  | 'PROMPT_INJECTION_DETECTED'
+  | 'MESSAGE_TOO_LONG'
+  | 'INVALID_INPUT';
+
+export interface ConsultantUsageLog {
+  userId: string;
+  endpoint: string;
+  model: string;
+  provider: AIProviderType;
+  inputTokens: number;
+  outputTokens: number;
+  cost: number;
+  conversationId?: string;
+  cached: boolean;
+  metadata?: {
+    context?: ConsultantContext;
+    hasFile?: boolean;
+    fileType?: 'pdf' | 'excel';
+    documentType?: DocumentType;
+  };
+}
+
+
+
+export interface PromptParts {
+  systemPrompt: string;
+  userContext: string;
+  documentContext: string;
+  conversationHistory: string;
+  userMessage: string;
+}
+
+export interface TokenEstimation {
+  systemTokens: number;
+  contextTokens: number;
+  historyTokens: number;
+  messageTokens: number;
+  totalTokens: number;
+  withinBudget: boolean;
 }

@@ -4,18 +4,16 @@ export const AI_PROVIDER = {
   GEMINI: 'gemini',
 } as const;
 
-
 export const AI_MODEL = {
   GROQ_LLAMA_70B: 'llama-3.3-70b-versatile',
   GROQ_LLAMA_8B: 'llama-3.1-8b-instant',
-  GEMINI_FLASH: 'gemini-3.0-flash',
-  GEMINI_PRO: 'gemini-3.0-pro',
+  GEMINI_FLASH: 'gemini-2.0-flash',
+  GEMINI_PRO: 'gemini-2.0-pro',
 } as const;
 
-//Biar cepet 
 export const AI_PROVIDER_PRIORITY = [AI_PROVIDER.GROQ, AI_PROVIDER.GEMINI] as const;
 
-// Rate Limiting nya
+//Limits AI nya 
 export const AI_RATE_LIMITS = {
   MONTHLY_LIMIT: 100,
   DAILY_LIMIT: 20,
@@ -23,256 +21,27 @@ export const AI_RATE_LIMITS = {
   ANALYSIS_MONTHLY_LIMIT: 30,
 } as const;
 
+// ============================================
+// AI TOKEN LIMITS
+// ============================================
 
 export const AI_TOKEN_LIMITS = {
   MAX_INPUT_TOKENS: 4000,
   MAX_OUTPUT_TOKENS: 2000,
-  MAX_CONVERSATION_HISTORY: 20, // Max pesannya ya
-}
+  MAX_CONVERSATION_HISTORY: 20,
+} as const;
 
-import type { AIConversation, AIConversationMessage, AIUsage, AIQuota } from '@prisma/client';
-
-export interface ConversationMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp?: Date;
-}
-
-export interface ConversationContext {
-  conversationId: string;
-  context?: string | null;
-  summary?: string | null;
-  messages: AIConversationMessage[];
-}
-
-export interface ChatInput {
-  message: string;
-  conversationId?: string;
-  context?: 'general' | 'education' | 'budgeting' | 'investment' | 'debt' | 'savings';
-}
-
-export interface ChatOutput {
-  reply: string;
-  conversationId: string;
-  tokens: {
-    input: number;
-    output: number;
-    total: number;
-  };
-  cached: boolean;
-}
-
-export interface FinancialHealthInput {
-  period?: 'weekly' | 'monthly' | 'yearly';
-}
-
-export interface FinancialHealthOutput {
-  score: number;
-  label: string;
-  color: string;
-  breakdown: {
-    savingsRate: number;
-    expenseRatio: number;
-    debtRatio: number;
-    emergencyFund: number;
-    diversification: number;
-  };
-  recommendations: string[];
-  insights: string;
-}
-
-export interface ReceiptScanInput {
-  imageBase64: string;
-  mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
-}
-
-export interface ReceiptScanOutput {
-  merchantName?: string;
-  date?: string;
-  total?: number;
-  items: Array<{
-    name: string;
-    quantity: number;
-    price: number;
-  category?: string;
-  suggestedCategory: string;
-  confidence: number;
- }>;
-  rawText: string;
-  confidence: number;
-}
-
-//Cash Flow nya
-
-export interface CashFlowPredictionInput {
-  months: number;
-  includeProjection?: boolean;
-}
-
-export interface CashFlowPredictionOutput {
-  months: number;
-  prediction: string;
-  projectedBalance: Array<{
-    month: string;
-    income: number;
-    expense: number;
-    balance: number;
-  }>;
-  historicalAverage: {
-    monthlyIncome: number;
-    monthlyExpense: number;
-    monthlySavings: number;
- };
-  recommendations: string[];
-}
-
-//Tax nya 
-
-export interface TaxEstimationInput {
-  year?: number;
-  incomeSource?: 'salary' | 'freelance' | 'business' | 'mixed';
-}
-
-export interface TaxEstimationOutput {
-  year: number;
-  estimatedTax: number;
-  breakdown: {
-    grossIncome: number;
-    deductions: number;
-    taxableIncome: number;
-    taxBrackets: Array<{
-      bracket: string;
-      rate: number;
-      amount: number;
- }>;
- };
-  recommendations: string;
-  disclaimer: string;
-}
-
-//Debt 
-
-export interface DebtStrategyInput {
-  debts: Array<{
-    name: string;
-    balance: number;
-    interestRate: number;
-    minimumPayment: number;
- }>;
-  strategy: 'snowball' | 'avalanche';
-  monthlyBudget: number;
-}
-
-export interface DebtStrategyOutput {
-  strategy: 'snowball' | 'avalanche';
-  strategyName: string;
-  strategyDescription: string;
-  totalDebt: number;
-  totalInterest: number;
-  monthsToPayoff: number;
-  paymentPlan: Array<{
-    month: number;
-    payments: Array<{
-      debtName: string;
-      payment: number;
-      remainingBalance: number;
- }>;
-    totalPayment: number;
- }>;
-  recommendations: string[];
-}
-
-// Quota Types
-export interface QuotaStatus {
-  monthly: {
-    limit: number;
-    used: number;
-    remaining: number;
-    resetAt: Date;
- };
-  daily: {
-    limit: number;
-    used: number;
-    remaining: number;
-    resetAt: Date;
- };
-}
-
-export interface UsageStats {
-  total: {
-    requests: number;
-    inputTokens: number;
-    outputTokens: number;
-    cost: number;
- };
-  byEndpoint: Array<{
-    endpoint: string;
-    requests: number;
-    inputTokens: number;
-    outputTokens: number;
-    cost: number;
- }>;
-  byModel: Array<{
-    model: string;
-    requests: number;
-    tokens: number;
- }>;
-  period: {
-    start: Date;
-    end: Date;
- };
-}
-
-export interface NarrativeReportInput {
-  period: 'weekly' | 'monthly' | 'yearly';
-}
-
-export interface FinancialProjectionInput {
-  months: number;
-}
-
-export interface FinancialAnalysisInput {
-  period: 'weekly' | 'monthly' | 'yearly';
-}
-
-export interface BudgetOptimizationInput {
-  monthlyIncome?: number;
-  savingsGoal?: string;
-  currency?: 'IDR' | 'USD';
-}
-
-export interface AnomalyDetectionInput {
-  period: 'weekly' | 'monthly' | 'yearly';
-  sensitivity?: 'low' | 'medium' | 'high';
-}
-
-export interface SmartCategorizationInput {
-  description: string;
-  amount?: number;
-  vendor?: string;
-}
-
-export interface GoalRecommendationInput {
-  goalType?: 'emergency_fund' | 'savings' | 'investment' | 'debt_payoff' | 'purchase' | 'general';
-  timeframe?: 'short' | 'medium' | 'long' | 'flexible';
-}
-
-export interface SpendingInsightsInput {
-  depth?: 'basic' | 'standard' | 'deep';
-  focus?: 'all' | 'category' | 'time' | 'behavior';
-
-} 
-
-//Pengingat
 export const AI_CACHE_TTL = {
-  SHORT: 300,      // 5 minutes
-  MEDIUM: 900,     // 15 minutes
-  LONG: 3600,      // 1 hour
-  VERY_LONG: 86400, // 24 hours
+  SHORT: 300,
+  MEDIUM: 900,
+  LONG: 3600,
+  VERY_LONG: 86400,
 } as const;
 
 
 export const AI_COST_PER_1K_TOKENS = {
+  GROQ_INPUT: 0.00001,
+  GROQ_OUTPUT: 0.00001,
   GEMINI_FLASH_INPUT: 0.000075,
   GEMINI_FLASH_OUTPUT: 0.0003,
   GEMINI_PRO_INPUT: 0.000125,
@@ -280,6 +49,7 @@ export const AI_COST_PER_1K_TOKENS = {
 } as const;
 
 
+//Perencanaan endpoint AI nya
 export const AI_ENDPOINTS = {
   NARRATIVE_REPORT: '/api/ai/narrative-report',
   FINANCIAL_PROJECTION: '/api/ai/financial-projection',
@@ -291,14 +61,24 @@ export const AI_ENDPOINTS = {
   SPENDING_INSIGHTS: '/api/ai/spending-insights',
   CHAT: '/api/ai/chat',
   EDUCATION_CHAT: '/api/education/chat',
+  CONSULTANT_CHAT: '/api/consultant/chat',
+  CONSULTANT_CHAT_FILE: '/api/consultant/chat/file',
 } as const;
 
 
 export const TRANSACTION_CATEGORIES = {
   INCOME: ['salary', 'bonus', 'investment', 'freelance', 'other_income'],
   EXPENSE: [
-    'food', 'transport', 'shopping', 'entertainment', 'health',
-    'education', 'household', 'bills', 'savings', 'other_expense'
+    'food',
+    'transport',
+    'shopping',
+    'entertainment',
+    'health',
+    'education',
+    'household',
+    'bills',
+    'savings',
+    'other_expense',
   ],
 } as const;
 
@@ -320,12 +100,15 @@ export const CATEGORY_TRANSLATIONS: Record<string, string> = {
   other_expense: 'Pengeluaran Lainnya',
 };
 
+
 export const HEALTH_SCORE = {
   EXCELLENT: { min: 80, label: 'Sangat Baik', color: 'green' },
   GOOD: { min: 60, max: 79, label: 'Baik', color: 'blue' },
   FAIR: { min: 40, max: 59, label: 'Cukup', color: 'yellow' },
   POOR: { min: 0, max: 39, label: 'Perlu Perbaikan', color: 'red' },
 } as const;
+
+
 
 export const EDUCATION_CONTEXT = {
   GENERAL: 'general',
@@ -346,7 +129,7 @@ export const AI_DEFAULTS = {
   TOP_K: 40,
 } as const;
 
-//Prompt nya
+// AI SYSTEM PROMPTS
 export const AI_SYSTEM_PROMPTS = {
   GENERAL: `Kamu adalah asisten finansial AI bernama FinGrow.
 
@@ -418,4 +201,144 @@ Contoh: "food", "salary", "transport"
 
 Jangan tambahkan penjelasan apapun.
 `,
+} as const;
+
+
+export const CONSULTANT_RATE_LIMITS = {
+  PER_MINUTE: 5,
+  PER_HOUR: 10,
+  PER_DAY: 20,
+} as const;
+
+export const CONSULTANT_QUOTA_LIMITS = {
+  DAILY_DEFAULT: 20,
+  MONTHLY_DEFAULT: 100,
+  DAILY_MIN: 5,
+  MONTHLY_MIN: 20,
+} as const;
+
+export const CONSULTANT_TOKEN_BUDGET = {
+  MAX_INPUT_TOKENS: 3500,
+  MAX_OUTPUT_TOKENS: 1500,
+  MAX_MESSAGE_LENGTH: 2000,
+  MAX_CONVERSATION_MESSAGES: 50,
+} as const;
+
+export const CONSULTANT_FILE_CONFIG = {
+  MAX_SIZE: 5 * 1024 * 1024, // 5MB
+  ALLOWED_MIME_TYPES: [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+  ] as const,
+  ALLOWED_EXTENSIONS: ['.pdf', '.xlsx', '.xls'],
+  MAX_PAGES_PDF: 50,
+  MAX_ROWS_EXCEL: 10000,
+} as const;
+
+export const CONSULTANT_CONVERSATION_LIMITS = {
+  MAX_MESSAGES: 100,
+  MAX_ACTIVE_CONVERSATIONS: 10,
+  INACTIVITY_EXPIRY_DAYS: 30,
+} as const;
+
+export const CONSULTANT_SYSTEM_PROMPT = `You are FinGrow AI Consultant, a personal financial advisor embedded inside the FinGrow application.
+
+## YOUR IDENTITY
+- Name: FinGrow AI Consultant
+- Tone: Professional but friendly, like a personal financial advisor who cares
+- Language: Indonesian (casual-professional, Jaksel style if user speaks casual)
+
+## YOUR CAPABILITIES
+You have access to user's personal financial data:
+- Complete transaction history
+- Financial summary (income, expense, balance)
+- Payment data
+- Business data (if UMKM user)
+- Education progress
+
+Use this data to provide PERSONAL and SPECIFIC advice, not generic suggestions.
+
+## YOUR SCOPE
+1. PERSONAL FINANCIAL ANALYSIS — based on real transaction data
+2. BUDGET RECOMMENDATION — realistic budget allocation
+3. CASH FLOW PREDICTION — financial projection based on history
+4. DOCUMENT ANALYSIS — analyze uploaded PDF/Excel financial documents
+5. FINANCIAL CONSULTATION — personal financial advice
+
+## STRICT BOUNDARIES
+ ALLOWED:
+- Personal finance advice based on user's actual data
+- Budget planning and optimization
+- Spending analysis and recommendations
+- Cash flow projections
+- Debt management strategies
+- Investment basics (concepts only, not specific stocks)
+- Business finance for UMKM
+
+ NOT ALLOWED:
+- Specific stock/coin recommendations
+- Market timing predictions
+- Legal or tax advice beyond basics
+- Anything outside financial domain
+
+If user asks outside boundaries, politely redirect:
+"Maaf, saya hanya bisa membantu soal keuangan personal dan bisnis ya. Untuk topik lain, coba konsultasi dengan profesional yang tepat."
+
+## CONTEXT INJECTION (runtime)
+{{USER_FINANCIAL_CONTEXT}}
+
+{{DOCUMENT_CONTEXT}}
+
+{{CONVERSATION_HISTORY}}
+
+## RESPONSE FORMAT
+1. Brief acknowledgment (1-2 sentences)
+2. Data-driven insight from user's actual data
+3. Specific recommendations with numbers
+4. End with 1 relevant follow-up question
+
+## SECURITY NOTES
+- Never reveal you have access to raw database
+- Never show sensitive data like account numbers
+- Always reference data as "based on your transaction history"
+- If data seems incomplete, acknowledge it honestly`;
+
+export const SUSPICIOUS_PATTERNS = [
+  /ignore\s+(previous|all)\s+instructions/i,
+  /system\s*:\s*you\s+are/i,
+  /disregard\s+(your|the)\s+(programming|instructions)/i,
+  /\[SYSTEM\]/i,
+  /<<.*>>/,
+  /\{\{.*\}\}/,
+  /###\s*IMPORTANT/i,
+  /forget\s+(everything|all)/i,
+  /you\s+are\s+now\s+a\s+different/i,
+  /new\s+instructions\s+below/i,
+] as const;
+
+export const CONSULTANT_CONTEXT_LABELS = {
+  USER_TYPE: {
+    user_personal: 'Pengguna Personal',
+    user_umkm: 'Pengguna UMKM',
+    admin: 'Administrator',
+  },
+  PERIOD: '6 bulan terakhir',
+  CURRENCY: 'IDR',
+  DATA_SOURCE: 'berdasarkan riwayat transaksi Anda',
+} as const;
+
+export const CONSULTANT_ERROR_MESSAGES = {
+  QUOTA_EXHAUSTED_DAILY: 'Quota harian Anda telah habis. Quota akan direset setiap tengah malam (00:00 WIB).',
+  QUOTA_EXHAUSTED_MONTHLY: 'Quota bulanan Anda telah habis. Quota akan direset setiap awal bulan.',
+  RATE_LIMIT_EXCEEDED: 'Terlalu banyak permintaan. Silakan coba lagi dalam beberapa menit.',
+  TOKEN_BUDGET_EXCEEDED: 'Pesan terlalu panjang. Silakan mulai percakapan baru atau singkatkan pesan Anda.',
+  FILE_TOO_LARGE: 'File terlalu besar. Maksimal ukuran file adalah 5MB.',
+  INVALID_FILE_TYPE: 'Tipe file tidak didukung. Gunakan file PDF atau Excel (.pdf, .xlsx, .xls).',
+  FILE_PARSE_ERROR: 'File tidak dapat dibaca. Pastikan file tidak rusak dan coba lagi.',
+  CONVERSATION_NOT_FOUND: 'Percakapan tidak ditemukan.',
+  CONVERSATION_ACCESS_DENIED: 'Anda tidak memiliki akses ke percakapan ini.',
+  CONVERSATION_LIMIT_EXCEEDED: 'Batas pesan dalam percakapan telah tercapai. Mulai percakapan baru.',
+  PROMPT_INJECTION_DETECTED: 'Pesan mengandung pola yang tidak diizinkan.',
+  MESSAGE_TOO_LONG: 'Pesan terlalu panjang. Maksimal 2000 karakter.',
 } as const;

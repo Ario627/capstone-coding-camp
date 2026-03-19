@@ -4,7 +4,7 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   API_PREFIX: z.string().default("api/v1"),
-  FRONTEND_URL: z.string().url().optional().default("http://localhost:5173"),
+  FRONTEND_URL: z.url().optional().default("http://localhost:5173"),
   DATABASE_URL: z.string().min(10),
   DIRECT_DATABASE_URL: z.string().min(10).optional(),
   JWT_ACCESS_SECRET: z.string().min(32),

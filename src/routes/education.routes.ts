@@ -69,3 +69,45 @@ educationRouter.get(
   }
 );
 
+educationRouter.get('/modules/:id', validate({params: moduleIdSchema}), async (req, res) => {
+  if (!req.user) throw new AppError(401, 'Unauthorized');
+  const result = await educationService.getLearningModule(req.user.sub, req.params.id as string);
+  sendSuccess(res, result);
+});
+
+educationRouter.post('/modules/:id/read', csrfMiddleware, validate({params: moduleIdSchema}), async (req, res) => {
+  if (!req.user) throw new AppError(401, 'Unauthorized');
+  const result = await educationService.markModuleRead(req.user.sub, req.params.id as string);
+  sendSuccess(res, result);
+});
+
+
+// TERMINOLOGY
+
+educationRouter.get(
+  '/terminologies',
+  validate({query: terminologyListSchema}),
+  async (req, res) => {
+    if (!req.user) throw new AppError(401, 'Unauthorized');
+    const result = await educationService.listTerminologies({
+      ...(req.query.category && { category: req.query.category as string }),
+      ...(req.query.search && { search: req.query.search as string }),
+      ...(req.query.page && { page: Number(req.query.page) }),
+      ...(req.query.limit && { limit: Number(req.query.limit) }),
+    });
+    sendSuccess(res, result);
+  }
+);
+
+educationRouter.get(
+  '/terminologies/:slug',
+  validate({ params: terminologySlugSchema }),
+  async (req, res) => {
+    if (!req.user) throw new AppError(401, 'Unauthorized');
+    const result = await educationService.getTerminologyBySlug(req.params.slug as string);
+    if (!result) {
+      throw new AppError(404, 'Terminology not found');
+    }
+    sendSuccess(res, result);
+  }
+);

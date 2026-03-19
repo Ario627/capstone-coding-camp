@@ -11,10 +11,14 @@ import { env } from "../config/env.config.js";
 export const authRouter = Router();
 
 function setRefreshTokenCookie(res: import("express").Response, token: string): void {
+  const isProduction = env().NODE_ENV === "production";
+  
+  console.log("[Auth] Setting refresh token cookie, isProduction:", isProduction);
+  
   res.cookie(COOKIE_REFRESH_TOKEN, token, {
     httpOnly: true,
-    secure: env().NODE_ENV === "production",
-    sameSite: "strict",
+    secure: isProduction,
+    sameSite: isProduction ? "strict" : "lax",
     path: "/",
     maxAge: 7 * 86_400_000,
   });
@@ -29,14 +33,24 @@ authRouter.post("/register", registrationRateLimit(), validate({body: registerSc
 
 // Login Endpoint /api/login
 authRouter.post("/login", loginRateLimit(), validate({ body: loginSchema }), async (req, res) => {
+  console.log("[Login] Request received");
   const result = await authService.loginUser(req.body);
+  console.log("[Login] Setting refresh token cookie");
   setRefreshTokenCookie(res, result.tokens.refreshToken);
+  console.log("[Login] Cookie set, sending response");
   sendSuccess(res, { accessToken: result.tokens.accessToken, user: result.user });
 });
 
 // Refresh Token Endpoint /api/refresh
 authRouter.post("/refresh", async (req, res) => {
+  console.log("[Refresh] Request received");
+  console.log("[Refresh] Cookies:", req.cookies);
+  console.log("[Refresh] Headers:", req.headers.cookie);
+  
   const rt: string | undefined = req.cookies?.[COOKIE_REFRESH_TOKEN];
+  console.log("[Refresh] Cookie name:", COOKIE_REFRESH_TOKEN);
+  console.log("[Refresh] Refresh token found:", rt ? "YES" : "NO");
+  
   const tokens = await authService.refreshToken(rt ?? "");
   setRefreshTokenCookie(res, tokens.refreshToken);
   sendSuccess(res, { accessToken: tokens.accessToken });
@@ -53,4 +67,4 @@ authRouter.post("/logout", authMiddleware, async (req, res) => {
 authRouter.get("/me", authMiddleware, async (req, res) => {
   const user = await authService.getCurrentUser(req.user!.sub);
   sendSuccess(res, { user });
-})
+});

@@ -298,3 +298,205 @@ export async function listLearningModules(
     limit,
   };
 }
+
+export async function getLearningModule(
+  userId: string,
+  moduleId: string
+): Promise<LearningModuleDetailOutput> {
+
+  const modules = await prisma.learningModule.findUnique({
+    where: { id: moduleId },
+  });
+  
+  if(!modules) throw new AppError(404, "Learning module not found");
+
+  const userRead = await prisma.userModuleRead.findUnique({
+    where: {
+      userId_moduleId: {
+        userId,
+        moduleId,
+      },
+    },
+  });
+
+  return {
+    id: modules.id,
+    title: modules.title,
+    slug: modules.slug,
+    description: modules.description,
+    category: modules.category,
+    difficulty: modules.difficulty,
+    duration: modules.duration,
+    videoUrl: modules.videoUrl,
+    thumbnailUrl: modules.thumbnailUrl,
+    order: modules.order,
+    content: modules.content,
+    isRead: !!userRead,
+    readAt: userRead?.readAt ?? null,
+  };
+}
+
+async function updateUserStreak(userId: string): Promise<void> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const streak = await prisma.userStreak.findUnique({
+    where: { userId },
+  });
+
+  if(!streak) {
+    await prisma.userStreak.create({
+      data: {
+        userId,
+        currentStreak: 1,
+        longestStreak: 1,
+        lastReadAt: today,
+      },
+    });
+    return;
+  }
+  const lastRead = streak.lastReadAt ? new Date(streak.lastReadAt) : null;
+  if (lastRead) {
+    lastRead.setHours(0, 0, 0, 0);
+  }
+
+  const dayDiff = lastRead
+    ? Math.floor((today.getTime() - lastRead.getTime()) / (1000 * 60 * 60 * 24))
+    : 999;
+
+  if(dayDiff === 0) return;
+
+  if (dayDiff === 1) {
+    const newStreak = streak.currentStreak + 1;
+    await prisma.userStreak.update({
+      where: { userId },
+      data: {
+        currentStreak: newStreak,
+        longestStreak: Math.max(streak.longestStreak, newStreak),
+        lastReadAt: today,
+      },
+    });
+  } else {
+    await prisma.userStreak.update({
+      where: { userId },
+      data: {
+        currentStreak: 1,
+        lastReadAt: today,
+      },
+    });
+  }
+}
+
+export async function markModuleRead(userId: string, moduleId: string): Promise<ModuleReadOutput> {
+  const modules = await prisma.learningModule.findUnique({
+    where: { id: moduleId },
+  });
+  
+  if(!modules) throw new AppError(404, "Learning module not found");
+
+  const readRecord = await prisma.userModuleRead.upsert({
+    where: {
+      userId_moduleId: {
+        userId,
+        moduleId,
+      },
+    },
+    update: {
+      isRead: true,
+      readAt: new Date(),
+    }, 
+    create: {
+      userId,
+      moduleId,
+      isRead: true,
+      readAt: new Date(),
+    },
+  });
+
+  await updateUserStreak(userId);
+
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: 'MODULE_READ',
+      entity: 'LearningModule',
+      entityId: moduleId,
+      after: { moduleId, moduleTitle: modules.title } as object,
+    },
+  });
+
+  return {
+    success: true,
+    moduleId,
+    readAt: readRecord.readAt!, 
+  };
+}
+
+export async function listTerminologies(
+  input: {
+    category?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  } = {}
+): Promise<{ terms: TerminologyOutput[]; total: number; page: number; limit: number }> {
+  const page = input.page ?? 1;
+  const limit = input.limit ?? 20;
+  const skip = (page - 1) * limit;
+
+  const whereClause: Record<string, unknown> = {};
+  if (input.category) {
+    whereClause.category = input.category;
+  }
+  if (input.search) {
+    whereClause.OR = [
+      { term: { contains: input.search, mode: 'insensitive' } },
+      { definition: { contains: input.search, mode: 'insensitive' } },
+    ];
+  }
+
+  const [terms, total] = await Promise.all([
+    prisma.terminology.findMany({
+      where: whereClause,
+      orderBy: { term: 'asc' },
+      skip,
+      take: limit,
+    }),
+    prisma.terminology.count({ where: whereClause }),
+  ]);
+
+  return {
+    terms: terms.map((t) => ({
+      id: t.id,
+      term: t.term,
+      slug: t.slug,
+      definition: t.definition,
+      category: t.category,
+      examples: t.examples as Array<{ title: string; description: string }> | null,
+      relatedTerms: t.relatedTerms,
+    })),
+    total,
+    page,
+    limit,
+  };
+}
+
+export async function getTerminologyBySlug(slug: string): Promise<TerminologyOutput | null> {
+  const term = await prisma.terminology.findUnique({
+    where: { slug },
+  });
+
+  if (!term) {
+    return null;
+  }
+
+  return {
+    id: term.id,
+    term: term.term,
+    slug: term.slug,
+    definition: term.definition,
+    category: term.category,
+    examples: term.examples as Array<{ title: string; description: string }> | null,
+    relatedTerms: term.relatedTerms,
+  };
+}

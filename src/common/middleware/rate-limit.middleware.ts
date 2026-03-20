@@ -1,6 +1,7 @@
 import rateLimit from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
 import { getRedis } from "../../lib/redis.js";
+import { CONSULTANT_RATE_LIMITS } from "../../modules/ai/ai-consultant.constant.js";
 
 function useRedisStore(): boolean {
     const flag = process.env.DISABLE_REDIS;
@@ -15,10 +16,10 @@ function createRedisSendCommand() {
 }
 //Catatan: Code di atas memakai AI karena errro yang tidak ketemu ketemu
 
-//Global
+// Global rate limit
 export function generalRateLimit() {
     return rateLimit({
-        windowMs: 60_000, // 1 minute
+        windowMs: 60_000,
         max: 100,
         standardHeaders: true,
         legacyHeaders: false,
@@ -29,12 +30,12 @@ export function generalRateLimit() {
     })
 }
 
-//Login
+// Login rate limit
 export function loginRateLimit() {
     return rateLimit({
-        windowMs: 900_000, 
-        max: 5, 
-        standardHeaders: true, 
+        windowMs: 900_000,
+        max: 5,
+        standardHeaders: true,
         legacyHeaders: false,
         ...(useRedisStore()
             ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:login:' }) }
@@ -43,26 +44,26 @@ export function loginRateLimit() {
     })
 }
 
-//Registration
+// Registration rate limit
 export function registrationRateLimit() {
     return rateLimit({
-        windowMs: 900_000, 
-        max: 5, 
-        standardHeaders: true, 
+        windowMs: 900_000,
+        max: 5,
+        standardHeaders: true,
         legacyHeaders: false,
         ...(useRedisStore()
             ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:reg:' }) }
             : {}),
         message: {success: false, message: 'Too many registration attempts, please try again later.'}
     })
-}   
+}
 
-//Oauth
+// OAuth rate limit
 export function oauthRateLimit() {
     return rateLimit({
-        windowMs: 900_000, 
-        max: 10, 
-        standardHeaders: true, 
+        windowMs: 900_000,
+        max: 10,
+        standardHeaders: true,
         legacyHeaders: false,
         ...(useRedisStore()
             ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:oauth:' }) }
@@ -71,6 +72,7 @@ export function oauthRateLimit() {
     })
 }
 
+// Payment rate limit
 export function paymentRateLimit() {
     return rateLimit({
         windowMs: 60_000,
@@ -82,6 +84,7 @@ export function paymentRateLimit() {
     })
 }
 
+// Webhook rate limit
 export function webhookRateLimit() {
     return rateLimit({
         windowMs: 60_000,
@@ -92,5 +95,47 @@ export function webhookRateLimit() {
             ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:whk:' }) }
             : {}),
         message: {success: false, message: 'Too many webhook requests, please try again later.'}
+    })
+}
+
+// AI rate limit (per user) - untuk ai.routes.ts
+export function aiRateLimit() {
+    return rateLimit({
+        windowMs: 60_000,
+        max: 10,
+        standardHeaders: true,
+        legacyHeaders: false,
+        keyGenerator: (req) => {
+            return req.user?.sub || req.ip || 'anonymous';
+        },
+        ...(useRedisStore()
+            ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:ai:' }) }
+            : {}),
+        message: {
+            success: false, 
+            message: 'Terlalu banyak permintaan ke AI. Silakan coba lagi dalam beberapa menit.',
+            code: 'RATE_LIMIT_EXCEEDED'
+        }
+    })
+}
+
+// AI Consultant rate limit (per user) - untuk consultant.routes.ts
+export function consultantRateLimit() {
+    return rateLimit({
+        windowMs: 60_000,
+        max: CONSULTANT_RATE_LIMITS.PER_MINUTE,
+        standardHeaders: true,
+        legacyHeaders: false,
+        keyGenerator: (req) => {
+            return req.user?.sub || req.ip || 'anonymous';
+        },
+        ...(useRedisStore()
+            ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:consultant:' }) }
+            : {}),
+        message: {
+            success: false, 
+            message: 'Terlalu banyak permintaan ke AI Consultant. Silakan coba lagi dalam beberapa menit.',
+            code: 'RATE_LIMIT_EXCEEDED'
+        }
     })
 }

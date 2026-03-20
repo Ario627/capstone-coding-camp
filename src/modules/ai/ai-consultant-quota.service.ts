@@ -115,3 +115,165 @@ export async function checkQuota(userId: string): Promise<QuotaCheck> {
     },
   };
 }
+
+export async function incrementUsage(userId: string): Promise<void> {
+  const now = new Date();
+  const existing = await prisma.aIQuota.findUnique({ where: { userId } });
+
+  if (!existing) {
+    await getOrCreateQuota(userId);
+  }
+
+  await prisma.aIQuota.update({
+    where: { userId },
+    data: {
+      usedToday: { increment: 1 },
+      usedThisMonth: { increment: 1 },
+    },
+  });
+
+  // Log to AIUsage
+  await prisma.aIUsage.create({
+    data: {
+      userId,
+      endpoint: "consultant_chat",
+      model: "unknown", // Will be updated by service
+      inputTokens: 0, // Will be updated by service
+      outputTokens: 0,
+      cost: 0,
+      cached: false,
+    },
+  });
+}
+
+function calculateCost(
+  provider: "groq" | "gemini",
+  inputTokens: number,
+  outputTokens: number,
+): number {
+  const COST_PER_1K = {
+    groq: { input: 0.00001, output: 0.00001 },
+    gemini_flash: { input: 0.000075, output: 0.0003 },
+  };
+
+  const rates =
+    provider === "groq" ? COST_PER_1K.groq : COST_PER_1K.gemini_flash;
+
+  const inputCost = (inputTokens / 1000) * rates.input;
+  const outputCost = (outputTokens / 1000) * rates.output;
+
+  return Number((inputCost + outputCost).toFixed(6));
+}
+
+export async function logUsage(
+  userId: string,
+  data: {
+    model: string;
+    provider: "groq" | "gemini";
+    inputTokens: number;
+    outputTokens: number;
+    conversationId?: string;
+    hasFile?: boolean;
+  },
+): Promise<void> {
+  //calcualte
+  const cost = calculateCost(
+    data.provider,
+    data.inputTokens,
+    data.outputTokens,
+  );
+
+  // Update last usage log
+  const lastUsage = await prisma.aIUsage.findFirst({
+    where: { userId, endpoint: "consultant_chat" },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (lastUsage) {
+    await prisma.aIUsage.update({
+      where: { id: lastUsage.id },
+      data: {
+        model: data.model,
+        inputTokens: data.inputTokens,
+        outputTokens: data.outputTokens,
+        cost,
+        metadata: {
+          conversationId: data.conversationId,
+          hasFile: data.hasFile,
+        },
+      },
+    });
+  }
+}
+
+export async function adjustQuota(
+  userId: string,
+  limits: { dailyLimit?: number; monthlyLimit?: number },
+): Promise<QuotaStatus> {
+  const updateData: { dailyLimit?: number; monthlyLimit?: number } = {};
+
+  if (limits.dailyLimit !== undefined) {
+    const daily = Math.max(
+      CONSULTANT_QUOTA_LIMITS.DAILY_MIN,
+      Math.min(limits.dailyLimit, CONSULTANT_QUOTA_LIMITS.DAILY_MAX),
+    );
+    updateData.dailyLimit = daily;
+  }
+
+  if (limits.monthlyLimit !== undefined) {
+    const monthly = Math.max(
+      CONSULTANT_QUOTA_LIMITS.MONTHLY_MIN,
+      Math.min(limits.monthlyLimit, CONSULTANT_QUOTA_LIMITS.MONTHLY_MAX),
+    );
+    updateData.monthlyLimit = monthly;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return getOrCreateQuota(userId);
+  }
+
+  await prisma.aIQuota.update({
+    where: { userId },
+    data: updateData,
+  });
+
+  return getOrCreateQuota(userId);
+}
+
+// Get usage stats user
+export async function getUsageStats(userId: string, days: number = 30): Promise<{
+  total: { requests: number; inputTokens: number; outputTokens: number; cost: number };
+  byDay: Array<{ date: string; requests: number; tokens: number }>;
+}> {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  
+  const usages = await prisma.aIUsage.findMany({
+    where: { userId, endpoint: 'consultant_chat', createdAt: { gte: since } },
+    select: { createdAt: true, inputTokens: true, outputTokens: true, cost: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  
+  const total = {
+    requests: usages.length,
+    inputTokens: usages.reduce((sum, u) => sum + u.inputTokens, 0),
+    outputTokens: usages.reduce((sum, u) => sum + u.outputTokens, 0),
+    cost: usages.reduce((sum, u) => sum + Number(u.cost), 0),
+  };
+  
+  // Group by day
+  const byDayMap = new Map<string, { requests: number; tokens: number }>();
+  for (const u of usages) {
+    const date = u.createdAt.toISOString().split('T')[0]!;
+    const existing = byDayMap.get(date) || { requests: 0, tokens: 0 };
+    existing.requests++;
+    existing.tokens += u.inputTokens + u.outputTokens;
+    byDayMap.set(date, existing);
+  }
+  
+  const byDay = Array.from(byDayMap.entries())
+    .map(([date, data]) => ({ date, ...data }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  
+  return { total, byDay };
+}

@@ -1,3 +1,5 @@
+import type { QuotaCheck } from "../modules/ai/ai.types.js";
+
 export interface JwtPayload {
     sub: string;
     email: string;
@@ -14,6 +16,7 @@ declare global {
                 body?: unknown;
                 query?: Record<string, any>;
                 params?: Record<string, string | string[]>;
+                quota?: QuotaCheck;
             };
         }
     }

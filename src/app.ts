@@ -12,6 +12,7 @@ import { umkmRouter } from "./routes/umkm.routes.js";
 import { tflRouter } from "./routes/tfl.routes.js";
 import { educationRouter } from "./routes/education.routes.js";
 import { aiRouter } from "./routes/ai.routes.js";
+import { consultantRouter } from "./routes/consultant.routes.js";
 
 export function createApp() {
   const app = express();
@@ -37,6 +38,7 @@ export function createApp() {
   app.use("/api/tfl", tflRouter);
   app.use("/api/education", educationRouter);
   app.use("/api/ai", aiRouter);
+  app.use("/api/consultant", consultantRouter);
 
   app.use(errorHandler);
   return app;

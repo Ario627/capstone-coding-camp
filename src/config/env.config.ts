@@ -18,8 +18,8 @@ export const envSchema = z.object({
   PAYMENT_ENCRYPTION_KEY: z.string().min(32).optional().default("dev-encryption-key-at-least-32-characters"),
   
   // AI nya 
-  GROQ_API_KEY: z.string().min(10).optional(),
-  GEMINI_API_KEY: z.string().min(10).optional(),
+  GROQ_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
@@ -32,6 +32,14 @@ export function validateEnv(): EnvConfig {
     console.error('Invalid env:', parsed.error.flatten().fieldErrors);
     process.exit(1);
   }
+
+  const apiKey = parsed.data.GROQ_API_KEY || parsed.data.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error(
+      "ERROR: At least one AI API key (GROQ_API_KEY or GEMINI_API_KEY) must be provided!",
+    );
+    process.exit(1);
+  }
   _env = parsed.data;
   return _env;
 }
@@ -42,3 +50,4 @@ export function env(): EnvConfig {
   }
   return _env;
 }
+

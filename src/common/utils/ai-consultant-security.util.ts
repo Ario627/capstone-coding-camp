@@ -68,7 +68,7 @@ export function validateMessage(message: string): {valid: boolean; error?: strin
     }
 
     const injection = detectPromptInjection(message);
-    if(!injection.detected) {
+    if(injection.detected) {
         return {valid: false, error: 'Pesan mengandung pola yang ga di izinkan'}
     }
 

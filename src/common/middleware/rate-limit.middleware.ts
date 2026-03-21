@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, {ipKeyGenerator} from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
 import { getRedis } from "../../lib/redis.js";
 import { CONSULTANT_RATE_LIMITS } from "../../modules/ai/ai-consultant.constant.js";
@@ -101,41 +101,53 @@ export function webhookRateLimit() {
 // AI rate limit (per user) - untuk ai.routes.ts
 export function aiRateLimit() {
     return rateLimit({
-        windowMs: 60_000,
-        max: 10,
-        standardHeaders: true,
-        legacyHeaders: false,
-        keyGenerator: (req) => {
-            return req.user?.sub || req.ip || 'anonymous';
-        },
-        ...(useRedisStore()
-            ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:ai:' }) }
-            : {}),
-        message: {
-            success: false, 
-            message: 'Terlalu banyak permintaan ke AI. Silakan coba lagi dalam beberapa menit.',
-            code: 'RATE_LIMIT_EXCEEDED'
-        }
-    })
+      windowMs: 60_000,
+      max: 10,
+      standardHeaders: true,
+      legacyHeaders: false,
+      keyGenerator: (req) => {
+        return req.user?.sub || (req.ip ? ipKeyGenerator(req.ip) : "anonymous");
+      },
+      ...(useRedisStore()
+        ? {
+            store: new RedisStore({
+              sendCommand: createRedisSendCommand(),
+              prefix: "rl:ai:",
+            }),
+          }
+        : {}),
+      message: {
+        success: false,
+        message:
+          "Terlalu banyak permintaan ke AI. Silakan coba lagi dalam beberapa menit.",
+        code: "RATE_LIMIT_EXCEEDED",
+      },
+    });
 }
 
 // AI Consultant rate limit (per user) - untuk consultant.routes.ts
 export function consultantRateLimit() {
     return rateLimit({
-        windowMs: 60_000,
-        max: CONSULTANT_RATE_LIMITS.PER_MINUTE,
-        standardHeaders: true,
-        legacyHeaders: false,
-        keyGenerator: (req) => {
-            return req.user?.sub || req.ip || 'anonymous';
-        },
-        ...(useRedisStore()
-            ? { store: new RedisStore({ sendCommand: createRedisSendCommand(), prefix: 'rl:consultant:' }) }
-            : {}),
-        message: {
-            success: false, 
-            message: 'Terlalu banyak permintaan ke AI Consultant. Silakan coba lagi dalam beberapa menit.',
-            code: 'RATE_LIMIT_EXCEEDED'
-        }
-    })
+      windowMs: 60_000,
+      max: CONSULTANT_RATE_LIMITS.PER_MINUTE,
+      standardHeaders: true,
+      legacyHeaders: false,
+      keyGenerator: (req) => {
+        return req.user?.sub || (req.ip ? ipKeyGenerator(req.ip) : "anonymous");
+      },
+      ...(useRedisStore()
+        ? {
+            store: new RedisStore({
+              sendCommand: createRedisSendCommand(),
+              prefix: "rl:consultant:",
+            }),
+          }
+        : {}),
+      message: {
+        success: false,
+        message:
+          "Terlalu banyak permintaan ke AI Consultant. Silakan coba lagi dalam beberapa menit.",
+        code: "RATE_LIMIT_EXCEEDED",
+      },
+    });
 }

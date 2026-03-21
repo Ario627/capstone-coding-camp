@@ -59,6 +59,8 @@ export function initializeAIProviders(): ProviderStatus {
 
     const primary = groqApiKey ? 'groq' : geminiApiKey ? 'gemini' : 'none';
 
+    
+
     return {
         groq: !!groqClient,
         gemini: !!geminiClient,
@@ -200,7 +202,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
         try {
                 console.log('Attempting generation with Groq...');
                 const result = await generateWithGroq(options);
-                console.log(`✅ Groq generation successful (${result.inputTokens} input, ${result.outputTokens} output tokens)`);
+                console.log(` Groq generation successful (${result.inputTokens} input, ${result.outputTokens} output tokens)`);
                 return result;
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -214,10 +216,11 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
             console.log("Fallback: Attempting generation with Gemini");
             const result = await generateWithGemini(options);
             console.log(`Gemini generation successful (${result.inputTokens} input, ${result.outputTokens} output tokens)`)
+            return result;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             errors.push({ provider: 'gemini', error: errorMessage });
-            console.error(`❌ Gemini also failed: ${errorMessage}`);
+            console.error(` Gemini also failed: ${errorMessage}`);
         }
     }
 

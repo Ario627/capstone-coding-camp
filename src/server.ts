@@ -3,13 +3,15 @@ import { createApp } from "./app.js";
 import { connectPrisma, disconnectPrisma } from "./lib/prisma.js";
 import { disconnectRedis } from "./lib/redis.js";
 import { validateEnv, env } from "./config/env.config.js";
+import { initializeAIProviders } from "./modules/ai/ai.provider.js";
+
 
 const logger = pino({ name: "server" });
 
 async function main() {
   validateEnv();
   await connectPrisma();
-
+  initializeAIProviders();
   const app = createApp();
   const server = app.listen(env().PORT, () => {
     logger.info({ port: env().PORT }, "Server listening");

@@ -40,6 +40,7 @@ export function createApp() {
   app.use("/api/education", csrfMiddleware, educationRouter);
   app.use("/api/ai", csrfMiddleware, aiRouter);
   app.use("/api/consultant", csrfMiddleware, consultantRouter);
+  app.use("/api/umkm", csrfMiddleware, umkmRouter);
 
   app.use(errorHandler);
   return app;

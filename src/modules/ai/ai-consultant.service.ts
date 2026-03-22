@@ -182,7 +182,7 @@ export async function chat(
       userId,
       "user",
       sanitizedMessage,
-      0,
+      estimateToken(sanitizedMessage),
       null,
     );
     await saveMessage(

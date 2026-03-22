@@ -3,7 +3,6 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { env } from "../../config/env.config.js";
 import { AppError } from "./error-handler.middleware.js";
 import { COOKIE_CSRF } from "../constants/index.js";
-import { th } from "zod/locales";
 
 export function csrfMiddleware(req: Request, res: Response, next: NextFunction): void {
     if(["GET", "HEAD", "OPTIONS"].includes(req.method.toUpperCase())) {

@@ -12,7 +12,7 @@ import { verifyBusinessOwnership } from "./business.service.js";
 import { da } from "zod/locales";
 
 //Helper 2
-async function verifyTransactionOwnership(
+export async function verifyTransactionOwnership(
   userId: string,
   businessId: string,
   transactionId: string,
@@ -36,7 +36,7 @@ async function verifyTransactionOwnership(
 }
 
 //Helper 3 parse tanggal
-function parseDate(dateInput: Date | string | undefined): Date {
+export function parseDate(dateInput: Date | string | undefined): Date {
   if (!dateInput) return new Date();
   if (dateInput instanceof Date) return dateInput;
 

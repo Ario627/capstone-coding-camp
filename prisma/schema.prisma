@@ -51,13 +51,13 @@ model User {
   paymentTransactions PaymentTransaction[]
   AuditLog            AuditLog[]
 
-  aiUsages            AIUsage[]
-  aiQuota             AIQuota?
-  aiConversations     AIConversation[]
-  moduleReads         UserModuleRead[]
-  dailyTips           UserDailyTip[]
-  achievements        UserAchievement[]
-  streak              UserStreak?
+  aiUsages        AIUsage[]
+  aiQuota         AIQuota?
+  aiConversations AIConversation[]
+  moduleReads     UserModuleRead[]
+  dailyTips       UserDailyTip[]
+  achievements    UserAchievement[]
+  streak          UserStreak?
 
   @@index([email])
   @@map("users")
@@ -110,17 +110,16 @@ model Business {
   description String?
   address     String?
   phone       String?
-  // Google Maps fields
-  lat         Float?    // Latitude
-  lng         Float?    // Longitude
-  category    String?   // Kategori bisnis (fnb, retail, service, dll)
+  lat         Float? // Latitude
+  lng         Float? // Longitude
+  category    String? // Kategori bisnis 
   isActive    Boolean   @default(true) @map("is_active")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  inventoryItems      InventoryItem[]
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inventoryItems       InventoryItem[]
   businessTransactions BusinessTransaction[]
 
   @@index([userId])
@@ -131,13 +130,13 @@ model BusinessTransaction {
   id              String          @id @default(cuid())
   businessId      String          @map("business_id")
   type            TransactionType // income | expense
-  amount          Int                                               // Dalam Rupiah
+  amount          Int // Dalam Rupiah
   category        String
   description     String
-  transactionDate DateTime        @map("transaction_date")       // Tanggal transaksi
-  paymentMethod   String?         @map("payment_method")         // Tunai, Transfer, QRIS, dll
-  notes           String?         @db.Text                       // Catatan tambahan
-  receiptUrl      String?         @map("receipt_url")            // URL foto nota/bukti
+  transactionDate DateTime        @map("transaction_date") // Tanggal transaksi
+  paymentMethod   String?         @map("payment_method") // Tunai, Transfer, QRIS, dll
+  notes           String?         @db.Text // Catatan tambahan
+  receiptUrl      String?         @map("receipt_url") // URL foto nota/bukti
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
   deletedAt       DateTime?       @map("deleted_at")
@@ -159,15 +158,20 @@ model InventoryItem {
   unitPrice  Decimal   @map("unit_price") @db.Decimal(15, 2)
   costPrice  Decimal   @default(0) @map("cost_price") @db.Decimal(15, 2)
   unit       String    @default("pcs")
+  minStock   Int       @default(0) @map("min_stock")
+  maxStock   Int?      @map("max_stock")
+  imageUrl   String?   @map("image_url")
+  barcode    String?
+  isActive   Boolean   @default(true) @map("is_active")
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
   deletedAt  DateTime? @map("deleted_at")
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User     User     @relation(fields: [userId], references: [id])
 
   @@index([businessId])
-  @@index([userId])
+  @@index([sku])
   @@map("inventory_items")
 }
 
@@ -190,8 +194,6 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
-
-
 
 model PaymentTransaction {
   id             String        @id @default(cuid())
@@ -220,7 +222,6 @@ model PaymentTransaction {
   @@index([status])
   @@map("payment_transactions")
 }
-
 
 model AIUsage {
   id           String   @id @default(cuid())
@@ -259,15 +260,15 @@ model AIQuota {
 }
 
 model AIConversation {
-  id        String                   @id @default(cuid())
+  id        String                  @id @default(cuid())
   userId    String
-  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  context   String?                  @db.Text
-  summary   String?                  @db.Text
-  isActive  Boolean                  @default(true)
+  user      User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  context   String?                 @db.Text
+  summary   String?                 @db.Text
+  isActive  Boolean                 @default(true)
   messages  AIConversationMessage[]
-  createdAt DateTime                 @default(now())
-  updatedAt DateTime                 @updatedAt
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
 
   @@index([userId])
   @@index([userId, isActive])
@@ -275,20 +276,19 @@ model AIConversation {
 }
 
 model AIConversationMessage {
-  id             String          @id @default(cuid())
+  id             String         @id @default(cuid())
   conversationId String
-  conversation   AIConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           String
-  content        String          @db.Text
-  tokens         Int             @default(0)
+  content        String         @db.Text
+  tokens         Int            @default(0)
   model          String?
-  createdAt      DateTime        @default(now())
+  createdAt      DateTime       @default(now())
 
   @@index([conversationId])
   @@index([conversationId, createdAt])
   @@map("ai_conversation_messages")
 }
-
 
 model LearningModule {
   id           String   @id @default(cuid())
@@ -315,14 +315,14 @@ model LearningModule {
 }
 
 model UserModuleRead {
-  id        String        @id @default(cuid())
+  id        String         @id @default(cuid())
   userId    String
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   moduleId  String
   module    LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  isRead    Boolean       @default(false)
+  isRead    Boolean        @default(false)
   readAt    DateTime?
-  createdAt DateTime      @default(now())
+  createdAt DateTime       @default(now())
 
   @@unique([userId, moduleId])
   @@index([userId])
@@ -345,14 +345,14 @@ model DailyTip {
 }
 
 model UserDailyTip {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   tipId     String
-  tip       DailyTip @relation(fields: [tipId], references: [id], onDelete: Cascade)
-  isRead    Boolean  @default(false)
+  tip       DailyTip  @relation(fields: [tipId], references: [id], onDelete: Cascade)
+  isRead    Boolean   @default(false)
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@unique([userId, tipId])
   @@index([userId, createdAt])

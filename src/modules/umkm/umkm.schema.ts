@@ -484,7 +484,6 @@ export const inventoryListQuerySchema = paginationQuerySchema.extend({
 
 //Report ygy
 export const reportPeriodSchema = z.object({
-  businessId: z.string().min(1, "Business ID wajib diisi"),
   period: z.enum(["daily", "weekly", "monthly", "yearly"]).default("monthly"),
 });
 

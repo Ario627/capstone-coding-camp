@@ -2,6 +2,7 @@ import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../common/middleware/error-handler.middleware.js";
 import { generateWithFallback, estimateToken } from "../ai/ai.provider.js";
 import { EDUCATION_SYSTEM_PROMPT, EDUCATION_CHAT_DEFAULTS, USER_DISPLAY_LABELS } from './education.constant.js';
+import { incrementUsage } from "../ai/ai-consultant-quota.service.js";
 import type { UserDisplayType } from './education.constant.js';
 import type { EducationChatOutput, EducationContext } from "../ai/ai.types.js";
 import type {
@@ -15,6 +16,7 @@ import type {
 } from './education.types.js';
 import { getUserDisplayType } from './education.types.js';
 import { exactOptional } from "zod";
+import { Prisma } from "@prisma/client";
 
 async function buildUserContext(userId: string): Promise<UserContext> {
     const [user, businessCount, threeMonthsAgo] = await Promise.all([
@@ -153,6 +155,22 @@ export async function educationChat(userId: string, input: {message: string; con
     },
   });
 
+  // Log to AIUsage
+  await prisma.aIUsage.create({
+    data: {
+      userId,
+      endpoint: 'education_chat',
+      model: result.provider,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      cost: 0,
+      cached: false,
+    },
+  });
+
+  // Update quota
+  await incrementUsage(userId);
+
   return {
     reply: result.text,
     conversationId: `edu_${Date.now()}_${userId.slice(0, 8)}`, // Generate conversation ID
@@ -177,14 +195,16 @@ export async function getDailyTip(
     whereC.category = input.category;
   }
 
-  const tip = await prisma.$queryRaw<Array<{ id: string; title: string; content: string; category: string }>>`
+  const tip = await prisma.$queryRaw<
+    Array<{ id: string; title: string; content: string; category: string }>
+  >`
     SELECT id, title, content, category 
     FROM daily_tips 
-    WHERE is_active = true 
-    ${input?.category ? prisma.$queryRaw`AND category = ${input.category}` : prisma.$queryRaw``}
+    WHERE "isActive" = true 
+    ${input?.category ? Prisma.sql`AND category = ${input.category}` : Prisma.empty}
     ORDER BY RANDOM() 
     LIMIT 1
-  `;
+`;
 
   if (!tip || tip.length === 0) {
     return null;

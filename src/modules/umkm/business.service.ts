@@ -37,14 +37,6 @@ export async function verifyBusinessOwnership(
 }
 
 export async function createBusiness(userId: string, dto: CreateBusinessInput) {
-  if (dto.lat !== undefined && dto.lat !== null)
-    throw new AppError(400, UMKM_ERROR_MESSAGES.LAT_LNG_REQUIRED);
-
-  if (dto.lng !== undefined && dto.lng !== null) {
-    if (dto.lat === undefined || dto.lat === null) {
-      throw new AppError(400, UMKM_ERROR_MESSAGES.LAT_LNG_REQUIRED);
-    }
-  }
 
   const business = await prisma.business.create({
     data: {
@@ -213,17 +205,14 @@ export async function updateBusiness(
 ) {
   const existing = await verifyBusinessOwnership(userId, businessId);
 
-  if (dto.lat !== undefined && dto.lat !== null) {
-    const lngValue = dto.lng ?? existing.lng;
-    if (lngValue === null || lngValue === undefined) {
-      throw new AppError(400, UMKM_ERROR_MESSAGES.LAT_LNG_REQUIRED);
-    }
-  }
-  if (dto.lng !== undefined && dto.lng !== null) {
-    const latValue = dto.lat ?? existing.lat;
-    if (latValue === null || latValue === undefined) {
-      throw new AppError(400, UMKM_ERROR_MESSAGES.LAT_LNG_REQUIRED);
-    }
+  const finalLat = dto.lat !== undefined ? dto.lat : existing.lat;
+  const finalLng = dto.lng !== undefined ? dto.lng : existing.lng;
+
+  const hasLat = finalLat !== null && finalLat !== undefined;
+  const hasLng = finalLng !== null && finalLng !== undefined;
+
+  if (hasLat !== hasLng) {
+    throw new AppError(400, UMKM_ERROR_MESSAGES.LAT_LNG_REQUIRED);
   }
 
   const data = Object.fromEntries(

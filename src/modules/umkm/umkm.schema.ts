@@ -66,13 +66,13 @@ export const createBusinessSchema = z
       .optional()
       .nullable(),
     lat: z
-      .number()
+      .coerce.number()
       .min(MAPS_LIMITS.LAT_MIN, `Latitude minimal ${MAPS_LIMITS.LAT_MIN}`)
       .max(MAPS_LIMITS.LAT_MAX, `Latitude maksimal ${MAPS_LIMITS.LAT_MAX}`)
       .optional()
       .nullable(),
     lng: z
-      .number()
+      .coerce.number()
       .min(MAPS_LIMITS.LNG_MIN, `Longitude minimal ${MAPS_LIMITS.LNG_MIN}`)
       .max(MAPS_LIMITS.LNG_MAX, `Longitude maksimal ${MAPS_LIMITS.LNG_MAX}`)
       .optional()
@@ -89,21 +89,9 @@ export const createBusinessSchema = z
   .strict()
   .refine(
     (data) => {
-      if (
-        data.lat !== undefined &&
-        data.lng !== null &&
-        (data.lat === undefined || data.lng === null)
-      ) {
-        return false;
-      }
-      if (
-        data.lng !== undefined &&
-        data.lng !== null &&
-        (data.lat === undefined || data.lat === null)
-      ) {
-        return false;
-      }
-      return true;
+      const hasLat = data.lat !== undefined && data.lat !== null;
+      const hasLng = data.lng !== undefined && data.lng !== null;
+      return hasLat === hasLng;
     },
     {
       message: "Latitude dan Longitude harus diisi bersamaan",
@@ -169,7 +157,7 @@ export const updateBusinessSchema = z
       }
       return true;
     },
-    { message: "Latitude dan Longitude harus diisi bersamaan" },
+    { message: "Latitude dan Longitude harus diisi bersamaanPOPPP" },
   );
 
 export const businessListQuerySchema = paginationQuerySchema.extend({

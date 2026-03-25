@@ -49,6 +49,10 @@
     "@types/multer": "^2.1.0",
     "@types/node": "^25.3.5",
     "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
     "tsx": "^4.20.5"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }

@@ -40,10 +40,16 @@ export function initializeAIProviders(): ProviderStatus {
     const geminiApiKey = env().GEMINI_API_KEY;
 
     if(groqApiKey) {
-        groqClient = new Groq({apiKey: groqApiKey});
+        groqClient = new Groq({
+          apiKey: groqApiKey,
+          timeout: 60 * 1000, 
+          maxRetries: 3,
+        });
+        console.log("Groq AI initialized with extended timeout");
         console.log("Groq AI initialized");
     } else {
         console.warn("Groq API key not configured, Groq AI will be unavailable");
+        
     }
 
     if(geminiApiKey) {
@@ -195,37 +201,56 @@ async function generateWithGemini(options: GenerateOptions): Promise<GenerateRes
     }
 }
 
-export async function generateWithFallback(options: GenerateOptions): Promise<GenerateResult> {
-    const errors: Array<{provider: string; error: string}> = [];
+export async function generateWithFallback(
+  options: GenerateOptions,
+): Promise<GenerateResult> {
+  const errors: Array<{ provider: string; error: string }> = [];
 
-    if (groqClient) {
-        try {
-                console.log('Attempting generation with Groq...');
-                const result = await generateWithGroq(options);
-                console.log(` Groq generation successful (${result.inputTokens} input, ${result.outputTokens} output tokens)`);
-                return result;
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                errors.push({ provider: 'groq', error: errorMessage });
-                console.warn(`Groq failed: ${errorMessage}. Falling back to Gemini...`);
-            }
+  if (groqClient) {
+    try {
+      console.log("Attempting generation with Groq...");
+      return await generateWithGroq(options);
+    } catch (error: any) {
+      console.error("--- DEBUG GROQ ERROR ---");
+      console.error("Status:", error?.status); 
+      console.error("Message:", error?.message);
+      if (error?.response?.data) {
+        console.error(
+          "Response Data:",
+          JSON.stringify(error.response.data, null, 2),
+        );
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      errors.push({ provider: "groq", error: errorMessage });
+      console.warn(`Groq failed. Falling back to Gemini...`);
     }
+  }
 
-    if(geminiClient) {
-        try {
-            console.log("Fallback: Attempting generation with Gemini");
-            const result = await generateWithGemini(options);
-            console.log(`Gemini generation successful (${result.inputTokens} input, ${result.outputTokens} output tokens)`)
-            return result;
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            errors.push({ provider: 'gemini', error: errorMessage });
-            console.error(` Gemini also failed: ${errorMessage}`);
-        }
+  if (geminiClient) {
+    try {
+      console.log("Fallback: Attempting generation with Gemini");
+      return await generateWithGemini(options);
+    } catch (error: any) {
+      console.error("--- DEBUG GEMINI ERROR ---");
+      console.error("Message:", error?.message);
+      if (error?.response) {
+        console.error(
+          "Gemini Details:",
+          JSON.stringify(error.response, null, 2),
+        );
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      errors.push({ provider: "gemini", error: errorMessage });
+      console.error(`Gemini also failed.`);
     }
+  }
 
-    const errorDetail = errors.map(err => `${err.provider}: ${err.error}`).join('; ')
-    throw new AppError(503, `All AI providers failed. ${errorDetail}`);
+  const errorDetail = errors
+    .map((err) => `${err.provider}: ${err.error}`)
+    .join("; ");
+  throw new AppError(503, `All AI providers failed. ${errorDetail}`);
 }
 
 export async function generateWithProvider(

@@ -2,7 +2,7 @@ import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
 import { getRedis } from "../../lib/redis.js";
 import { CONSULTANT_RATE_LIMITS } from "../../modules/ai/ai-consultant.constant.js";
-import { UMKM_RATE_LIMITS } from "../constants/index.js";
+import { UMKM_RATE_LIMITS, WALLET_RATE_LIMITS } from "../constants/index.js";
 
 function useRedisStore(): boolean {
   const flag = process.env.DISABLE_REDIS;
@@ -257,5 +257,104 @@ export function umkmWriteRateLimit() {
         "Terlalu banyak permintaan. Silakan coba lagi dalam beberapa menit.",
       code: "RATE_LIMIT_EXCEEDED",
     },
+  });
+}
+
+export function walletReadRateLimit() {
+  return rateLimit({
+    windowMs: WALLET_RATE_LIMITS.READ_WINDOW_MS,
+    max: WALLET_RATE_LIMITS.READ_MAX_REQUESTS,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: getUserKey,
+    ...(useRedisStore()
+      ? {
+          store: new RedisStore({
+            sendCommand: createRedisSendCommand(),
+            prefix: "rl:wallet:r:",
+          }),
+        }
+      : {}),
+    message: {
+      success: false,
+      message:
+        "Terlalu banyak permintaan. Silakan coba lagi dalam beberapa menit.",
+      code: "RATE_LIMIT_EXCEEDED",
+    },
+  });
+}
+
+function getUserKey(req: {
+  user?: { sub?: string };
+  ip?: string | undefined;
+}): string {
+  if (req.user?.sub) return `user:${req.user.sub}`;
+  return req.ip ? ipKeyGenerator(req.ip) : "anonymous";
+}
+
+export function walletWriteRateLimit() {
+  return rateLimit({
+    windowMs: WALLET_RATE_LIMITS.WRITE_WINDOW_MS,
+    max: WALLET_RATE_LIMITS.WRITE_MAX_REQUESTS,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: getUserKey,
+    ...(useRedisStore()
+      ? {
+          store: new RedisStore({
+            sendCommand: createRedisSendCommand(),
+            prefix: "rl:wallet:w:",
+          }),
+        }
+      : {}),
+    message: {
+      success: false,
+      message:
+        "Terlalu banyak permintaan. Silakan coba lagi dalam beberapa menit.",
+      code: "RATE_LIMIT_EXCEEDED",
+    },
+  });
+}
+
+export function walletTransferRateLimit() {
+  return rateLimit({
+    windowMs: WALLET_RATE_LIMITS.TRANSFER_WINDOW_MS,
+    max: WALLET_RATE_LIMITS.TRANSFER_MAX_REQUESTS,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: getUserKey,
+    ...(useRedisStore()
+      ? {
+          store: new RedisStore({
+            sendCommand: createRedisSendCommand(),
+            prefix: "rl:wallet:transfer:",
+          }),
+        }
+      : {}),
+    message: {
+      success: false,
+      message:
+        "Terlalu banyak transfer. Silakan coba lagi dalam beberapa menit.",
+      code: "RATE_LIMIT_EXCEEDED",
+    },
+  });
+}
+
+export function walletCallbackRateLimit() {
+  return rateLimit({
+    windowMs: WALLET_RATE_LIMITS.CALLBACK_WINDOW_MS,
+    max: WALLET_RATE_LIMITS.CALLBACK_MAX_REQUESTS,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.ip ?? "unknown",
+    ...(useRedisStore()
+      ? {
+          store: new RedisStore({
+            sendCommand: createRedisSendCommand(),
+            prefix: "rl:wallet:cb:",
+          }),
+        }
+      : {}),
+    message: { success: false, message: "Too many requests." },
   });
 }

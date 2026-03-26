@@ -34,6 +34,26 @@ enum PaymentMethod {
   CREDIT_CARD
 }
 
+enum WalletTransactionType {
+  TOP_UP       
+  PPOB         
+  TRANSFER_IN  
+  TRANSFER_OUT 
+  WITHDRAWAL   
+  REFUND       
+}
+
+enum WalletTransactionStatus {
+  PENDING    
+  PROCESSING 
+  COMPLETED  
+  FAILED     // Gagal
+  CANCELLED  // Dibatalkan
+  REFUNDED   // Di refund
+}
+
+
+
 model User {
   id                  String               @id @default(cuid())
   email               String               @unique
@@ -42,6 +62,7 @@ model User {
   isActive            Boolean              @default(true) @map("is_active")
   lastLoginAt         DateTime?            @map("last_login_at")
   loginCount          Int                  @default(0) @map("login_count")
+  walletBalance       Int                  @default(0) @map("wallet_balance")
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   transactions        Transaction[]
@@ -49,6 +70,7 @@ model User {
   Business            Business[]
   inventoryItems      InventoryItem[]
   paymentTransactions PaymentTransaction[]
+  walletTransactions  WalletTransaction[]
   AuditLog            AuditLog[]
 
   aiUsages        AIUsage[]
@@ -95,6 +117,8 @@ model Transaction {
   deletedAt    DateTime?       @map("deleted_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletTransaction WalletTransaction?
+
 
   @@index([userId, createdAt])
   @@index([txHash])
@@ -215,6 +239,7 @@ model PaymentTransaction {
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletTransaction WalletTransaction?
 
   @@index([userId])
   @@index([externalId])
@@ -416,4 +441,38 @@ model UserAchievement {
   @@index([userId])
   @@index([achievementId])
   @@map("user_achievements")
+}
+
+
+model WalletTransaction {
+  id                   String                  @id @default(cuid())
+  userId               String                  @map("user_id")
+  paymentTransactionId String?                 @unique @map("payment_transaction_id")
+  transactionId        String                  @unique @map("transaction_id")
+  type                 WalletTransactionType
+  amount               Int
+  balanceBefore        Int                     @map("balance_before")
+  balanceAfter         Int                     @map("balance_after")
+  status               WalletTransactionStatus @default(PENDING)
+  description          String?
+  referenceId          String?                 @map("reference_id")
+  metadata             Json?
+  recipientUserId      String?                 @map("recipient_user_id")
+  createdAt            DateTime                @default(now()) @map("created_at")
+  updatedAt            DateTime                @updatedAt @map("updated_at")
+  deletedAt            DateTime?               @map("deleted_at")
+
+  user               User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentTransaction PaymentTransaction?   @relation(fields: [paymentTransactionId], references: [id], onDelete: SetNull)
+  transaction        Transaction           @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, type])
+  @@index([userId, status])
+  @@index([paymentTransactionId])
+  @@index([transactionId])
+  @@index([referenceId])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([deletedAt])
+  @@map("wallet_transactions")
 }

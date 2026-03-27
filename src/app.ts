@@ -14,6 +14,7 @@ import { tflRouter } from "./routes/tfl.routes.js";
 import { educationRouter } from "./routes/education.routes.js";
 import { aiRouter } from "./routes/ai.routes.js";
 import { consultantRouter } from "./routes/consultant.routes.js";
+import { walletRouter } from "./routes/wallet.routes.js";
 
 export function createApp() {
   const app = express();
@@ -32,6 +33,7 @@ export function createApp() {
 
   app.get("/health", (_req, res) => res.json({ success: true }));
 
+  app.use("/api/wallet", walletRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/transactions", csrfMiddleware, transactionsRouter);
   app.use("/api/payments", csrfMiddleware, paymentRouter);
@@ -41,6 +43,7 @@ export function createApp() {
   app.use("/api/ai", csrfMiddleware, aiRouter);
   app.use("/api/consultant", csrfMiddleware, consultantRouter);
   app.use("/api/umkm", csrfMiddleware, umkmRouter);
+  
 
   app.use(errorHandler);
   return app;

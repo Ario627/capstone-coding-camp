@@ -13,10 +13,8 @@ export interface ProcessWalletTransactionInput {
   amount: number;
   description?: string;
   referenceId?: string;
-  paymentTransactionId?: string;
   recipientUserId?: string;
   metadata?: Record<string, unknown>;
-  initialStatus?: WalletTransactionStatus;
 }
 
 export interface ProcessWalletTransactionResult {
@@ -30,47 +28,36 @@ export interface ProcessWalletTransactionResult {
 export async function processWalletTransaction(
   input: ProcessWalletTransactionInput,
 ): Promise<ProcessWalletTransactionResult> {
-  return await prisma.$transaction(async (tx) => {
-    const user = await tx.user.findUnique({
-      where: { id: input.userId },
-      select: { id: true, walletBalance: true },
-    });
+  if (input.type === "TOP_UP") {
+    throw new AppError(
+      400,
+      "TOP_UP must use initiateTopUp flow, not processWalletTransaction",
+    );
+  }
 
-    if (!user) {
+  return await prisma.$transaction(async (tx) => {
+    const users = await tx.$queryRaw<{ id: string; walletBalance: number }[]>`
+      SELECT id, wallet_balance FROM users WHERE id = ${input.userId} FOR UPDATE
+    `;
+
+    if (!users || users.length === 0) {
       throw new AppError(404, "User not found");
     }
 
+    const user = users[0]!;
     const balanceBefore = user.walletBalance;
     let balanceAfter: number;
     let transactionType: "income" | "expense";
-    let status: WalletTransactionStatus = input.initialStatus ?? "PROCESSING";
 
-    switch (input.type) {
-      case "TOP_UP":
-      case "TRANSFER_IN":
-      case "REFUND":
-        balanceAfter = balanceBefore + input.amount;
-        transactionType = "income";
-        if (input.type === "TOP_UP") {
-          status = input.initialStatus ?? "PENDING";
-        } else {
-          status = "COMPLETED";
-        }
-        break;
-
-      case "PPOB":
-      case "TRANSFER_OUT":
-      case "WITHDRAWAL":
-        if (balanceBefore < input.amount) {
-          throw new AppError(400, "Insufficient balance");
-        }
-        balanceAfter = balanceBefore - input.amount;
-        transactionType = "expense";
-        status = "COMPLETED";
-        break;
-
-      default:
-        throw new AppError(400, "Invalid transaction type");
+    if (input.type === "TRANSFER_IN" || input.type === "REFUND") {
+      balanceAfter = balanceBefore + input.amount;
+      transactionType = "income";
+    } else {
+      if (balanceBefore < input.amount) {
+        throw new AppError(400, "Insufficient balance");
+      }
+      balanceAfter = balanceBefore - input.amount;
+      transactionType = "expense";
     }
 
     await tx.user.update({
@@ -94,13 +81,12 @@ export async function processWalletTransaction(
     const walletTransaction = await tx.walletTransaction.create({
       data: {
         userId: input.userId,
-        paymentTransactionId: input.paymentTransactionId ?? null,
         transactionId: transaction.id,
         type: input.type,
         amount: input.amount,
         balanceBefore,
         balanceAfter,
-        status,
+        status: "COMPLETED",
         description: input.description ?? null,
         referenceId: input.referenceId ?? null,
         metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
@@ -118,7 +104,7 @@ export async function processWalletTransaction(
           amount: input.amount,
           balanceBefore,
           balanceAfter,
-          status,
+          status: "COMPLETED",
           type: input.type,
         } as Prisma.InputJsonValue,
       },
@@ -129,64 +115,7 @@ export async function processWalletTransaction(
       transactionId: transaction.id,
       balanceBefore,
       balanceAfter,
-      status: walletTransaction.status,
+      status: "COMPLETED",
     };
-  });
-}
-
-export async function updateWalletTransactionStatus(
-  walletTransactionId: string,
-  newStatus: WalletTransactionStatus,
-  additionalMetadata?: Record<string, unknown>,
-): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    const walletTx = await tx.walletTransaction.findUnique({
-      where: { id: walletTransactionId },
-      select: {
-        id: true,
-        userId: true,
-        amount: true,
-        status: true,
-        metadata: true,
-      },
-    });
-
-    if (!walletTx) {
-      throw new AppError(404, "Wallet transaction not found");
-    }
-
-    if (newStatus === "COMPLETED" && walletTx.status === "PENDING") {
-      await tx.user.update({
-        where: { id: walletTx.userId },
-        data: { walletBalance: { increment: walletTx.amount } },
-      });
-    }
-
-    const updateData: Prisma.WalletTransactionUpdateInput = {
-      status: newStatus,
-    };
-
-    if (additionalMetadata) {
-      updateData.metadata = {
-        ...(walletTx.metadata as Record<string, unknown>),
-        ...additionalMetadata,
-      } as Prisma.InputJsonValue;
-    }
-
-    await tx.walletTransaction.update({
-      where: { id: walletTransactionId },
-      data: updateData,
-    });
-
-    await tx.auditLog.create({
-      data: {
-        userId: walletTx.userId,
-        action: `WALLET_STATUS_UPDATE`,
-        entity: "WalletTransaction",
-        entityId: walletTransactionId,
-        before: { status: walletTx.status } as Prisma.InputJsonValue,
-        after: { status: newStatus } as Prisma.InputJsonValue,
-      },
-    });
   });
 }

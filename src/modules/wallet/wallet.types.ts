@@ -17,6 +17,8 @@ export interface TopUpResult {
   redirectUrl?: string;
   amount: number;
   expiresAt: Date;
+  status: WalletTransactionStatus;
+  walletTransactionId: string;
 }
 
 export interface PPOBInput {

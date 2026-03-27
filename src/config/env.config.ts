@@ -39,17 +39,12 @@ export const envSchema = z.object({
   GROQ_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
 
-  MIDTRANS_SERVER_KEY: z
-    .string()
-    .min(1)
-    .optional()
-    .default("SB-Midserver-xxxxxxxx"),
-  MIDTRANS_CLIENT_KEY: z
-    .string()
-    .min(1)
-    .optional()
-    .default("SB-Mid-client-xxxxxxxx"),
-  MIDTRANS_IS_PRODUCTION: z.coerce.boolean().default(false),
+  MIDTRANS_SERVER_KEY: z.string().min(1).optional(),
+  MIDTRANS_CLIENT_KEY: z.string().min(1).optional(),
+  
+  MIDTRANS_IS_PRODUCTION: z
+    .enum(["true", "false"])
+    .transform((val) => val === "true"),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

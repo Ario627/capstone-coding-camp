@@ -21,135 +21,145 @@ export interface TransferResult {
   recipientId: string;
 }
 
-export async function processTransfer(input: TransferInput): Promise<TransferResult> {
-    const { senderId, recipientId, amount, note } = input;
+export async function processTransfer(
+  input: TransferInput,
+): Promise<TransferResult> {
+  const { senderId, recipientId, amount, note } = input;
 
-    if(senderId === recipientId) {
-        throw new AppError(400, "Cannot transfer to self");
+  if (senderId === recipientId) {
+    throw new AppError(
+      400,
+      WALLET_TRANSACTION_MESSAGES.CANNOT_TRANSFER_TO_SELF,
+    );
+  }
+
+  if (
+    amount < WALLET_LIMITS.MIN_TRANSACTION ||
+    amount > WALLET_LIMITS.MAX_TRANSACTION
+  ) {
+    throw new AppError(400, WALLET_TRANSACTION_MESSAGES.INVALID_AMOUNT);
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    const senders = await tx.$queryRaw<{ id: string; walletBalance: number }[]>`
+      SELECT id, wallet_balance FROM users WHERE id = ${senderId} FOR UPDATE
+    `;
+
+    if (!senders || senders.length === 0) {
+      throw new AppError(404, WALLET_TRANSACTION_MESSAGES.USER_NOT_FOUND);
     }
 
-    if (
-      amount < WALLET_LIMITS.MIN_TRANSACTION ||
-      amount > WALLET_LIMITS.MAX_TRANSACTION
-    ) {
-      throw new AppError(400, WALLET_TRANSACTION_MESSAGES.INVALID_AMOUNT);
+    const sender = senders[0]!;
+
+    if (sender.walletBalance < amount) {
+      throw new AppError(400, WALLET_TRANSACTION_MESSAGES.INSUFFICIENT_BALANCE);
     }
 
-    return await prisma.$transaction(async (tx) => {
-      const sender = await tx.user.findUnique({
-        where: { id: senderId },
-        select: { id: true, walletBalance: true },
-      });
+    const recipients = await tx.$queryRaw<
+      { id: string; walletBalance: number }[]
+    >`
+      SELECT id, wallet_balance FROM users WHERE id = ${recipientId} FOR UPDATE
+    `;
 
-      if (!sender) {
-        throw new AppError(404, WALLET_TRANSACTION_MESSAGES.USER_NOT_FOUND);
-      }
+    if (!recipients || recipients.length === 0) {
+      throw new AppError(404, WALLET_TRANSACTION_MESSAGES.RECIPIENT_NOT_FOUND);
+    }
 
-      if (sender.walletBalance < amount) {
-        throw new AppError(
-          400,
-          WALLET_TRANSACTION_MESSAGES.INSUFFICIENT_BALANCE,
-        );
-      }
+    const recipient = recipients[0]!;
 
-      const recipient = await tx.user.findUnique({
-        where: { id: recipientId },
-        select: { id: true, walletBalance: true },
-      });
+    const senderBalanceAfter = sender.walletBalance - amount;
+    const recipientBalanceAfter = recipient.walletBalance + amount;
 
-      if (!recipient) {
-        throw new AppError(
-          404,
-          WALLET_TRANSACTION_MESSAGES.RECIPIENT_NOT_FOUND,
-        );
-      }
-
-      const senderBalanceAfter = sender.walletBalance - amount;
-      const recipientBalanceAfter = recipient.walletBalance + amount;
-
-      await tx.user.update({
-        where: { id: senderId },
-        data: { walletBalance: senderBalanceAfter },
-      });
-
-      await tx.user.update({
-        where: { id: recipientId },
-        data: { walletBalance: recipientBalanceAfter },
-      });
-
-      const senderTransaction = await tx.transaction.create({
-        data: {
-          userId: senderId,
-          amount,
-          type: "expense",
-          category: "Transfer Keluar",
-          description: note ?? "Transfer keluar",
-        },
-      });
-
-      const recipientTransaction = await tx.transaction.create({
-        data: {
-          userId: recipientId,
-          amount,
-          type: "income",
-          category: "Transfer Masuk",
-          description: note ?? "Transfer masuk",
-        },
-      });
-
-      const senderWalletTx = await tx.walletTransaction.create({
-        data: {
-          userId: senderId,
-          transactionId: senderTransaction.id,
-          type: "TRANSFER_OUT",
-          amount,
-          balanceBefore: sender.walletBalance,
-          balanceAfter: senderBalanceAfter,
-          status: "COMPLETED",
-          description: note ?? "Transfer keluar",
-          recipientUserId: recipientId,
-        },
-      });
-
-      const recipientWalletTx = await tx.walletTransaction.create({
-        data: {
-          userId: recipientId,
-          transactionId: recipientTransaction.id,
-          type: "TRANSFER_IN",
-          amount,
-          balanceBefore: recipient.walletBalance,
-          balanceAfter: recipientBalanceAfter,
-          status: "COMPLETED",
-          description: note ?? "Transfer masuk",
-          recipientUserId: senderId,
-        },
-      });
-
-      await tx.auditLog.createMany({
-        data: [
-          {
-            userId: senderId,
-            action: "WALLET_TRANSFER_OUT",
-            entity: "WalletTransaction",
-            entityId: senderWalletTx.id,
-            after: { amount, recipientId, note } as Prisma.InputJsonValue,
-          },
-          {
-            userId: recipientId,
-            action: "WALLET_TRANSFER_IN",
-            entity: "WalletTransaction",
-            entityId: recipientWalletTx.id,
-            after: { amount, senderId, note } as Prisma.InputJsonValue,
-          },
-        ],
-      });
-
-      return {
-        senderTransactionId: senderWalletTx.id,
-        recipientTransactionId: recipientWalletTx.id,
-        amount,
-        status: "COMPLETED",
-        recipientId,
-      };
+    // Update sender balance
+    await tx.user.update({
+      where: { id: senderId },
+      data: { walletBalance: senderBalanceAfter },
     });
+
+    // Update recipient balance
+    await tx.user.update({
+      where: { id: recipientId },
+      data: { walletBalance: recipientBalanceAfter },
+    });
+
+    // Create Transaction for sender (expense)
+    const senderTransaction = await tx.transaction.create({
+      data: {
+        userId: senderId,
+        amount,
+        type: "expense",
+        category: "Transfer Keluar",
+        description: note ?? "Transfer keluar",
+      },
+    });
+
+    // Create Transaction for recipient (income)
+    const recipientTransaction = await tx.transaction.create({
+      data: {
+        userId: recipientId,
+        amount,
+        type: "income",
+        category: "Transfer Masuk",
+        description: note ?? "Transfer masuk",
+      },
+    });
+
+    // Create WalletTransaction for sender (TRANSFER_OUT)
+    const senderWalletTx = await tx.walletTransaction.create({
+      data: {
+        userId: senderId,
+        transactionId: senderTransaction.id,
+        type: "TRANSFER_OUT",
+        amount,
+        balanceBefore: sender.walletBalance,
+        balanceAfter: senderBalanceAfter,
+        status: "COMPLETED",
+        description: note ?? "Transfer keluar",
+        recipientUserId: recipientId,
+      },
+    });
+
+    // Create WalletTransaction for recipient (TRANSFER_IN)
+    const recipientWalletTx = await tx.walletTransaction.create({
+      data: {
+        userId: recipientId,
+        transactionId: recipientTransaction.id,
+        type: "TRANSFER_IN",
+        amount,
+        balanceBefore: recipient.walletBalance,
+        balanceAfter: recipientBalanceAfter,
+        status: "COMPLETED",
+        description: note ?? "Transfer masuk",
+        recipientUserId: senderId,
+      },
+    });
+
+    // Audit logs
+    await tx.auditLog.createMany({
+      data: [
+        {
+          userId: senderId,
+          action: "WALLET_TRANSFER_OUT",
+          entity: "WalletTransaction",
+          entityId: senderWalletTx.id,
+          after: { amount, recipientId, note } as Prisma.InputJsonValue,
+        },
+        {
+          userId: recipientId,
+          action: "WALLET_TRANSFER_IN",
+          entity: "WalletTransaction",
+          entityId: recipientWalletTx.id,
+          after: { amount, senderId, note } as Prisma.InputJsonValue,
+        },
+      ],
+    });
+
+    return {
+      senderTransactionId: senderWalletTx.id,
+      recipientTransactionId: recipientWalletTx.id,
+      amount,
+      status: "COMPLETED",
+      recipientId,
+    };
+  });
 }

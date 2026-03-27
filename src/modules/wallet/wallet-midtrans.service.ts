@@ -8,10 +8,6 @@ import {
   WALLET_LIMITS,
   MIDTRANS_TRANSACTION_STATUS_MAP,
 } from "./wallet.constant.js";
-import {
-  processWalletTransaction,
-  updateWalletTransactionStatus,
-} from "./wallet-transaction.service.js";
 import type {
   TopUpInput,
   TopUpResult,
@@ -32,17 +28,24 @@ function verifyMidtransSignature(
   receivedSignature: string,
 ): boolean {
   const serverKey = env().MIDTRANS_SERVER_KEY;
+
   const expectedSignature = createHash("sha512")
     .update(orderId + statusCode + grossAmount + serverKey)
-    .digest("hex");
+    .digest("hex"); 
 
+  console.log("expectedSignature:", expectedSignature);
   try {
     const received = Buffer.from(receivedSignature, "utf-8");
-    const expected = Buffer.from(expectedSignature, "utf-8");
+    const expected = Buffer.from(expectedSignature, "utf-8"); 
+
+    console.log("\nreceivedSignature:", receivedSignature);
+    console.log("received:", received);
+    console.log("expected:", expected);
 
     if (received.length !== expected.length) return false;
     return timingSafeEqual(received, expected);
-  } catch {
+  } catch (error) {
+    console.error("ERROR DI SIGNATURE:", error);
     return false;
   }
 }
@@ -50,11 +53,9 @@ function verifyMidtransSignature(
 async function createMidtransSnapToken(
   orderId: string,
   amount: number,
-): Promise<string> {
+): Promise<{ token: string; redirectUrl: string }> {
   const isProduction = env().MIDTRANS_IS_PRODUCTION;
   const serverKey = env().MIDTRANS_SERVER_KEY;
-  const clientKey = env().MIDTRANS_CLIENT_KEY;
-
   const authString = Buffer.from(serverKey + ":").toString("base64");
 
   const requestBody = {
@@ -73,6 +74,18 @@ async function createMidtransSnapToken(
     : "https://app.sandbox.midtrans.com/snap/v1/transactions";
 
   try {
+    console.log("=== DEBUG MIDTRANS ===");
+    console.log("1. isProduction:", isProduction);
+    console.log("2. Base URL:", baseUrl);
+    console.log(
+      "3. Server Key kebaca ga?:",
+      serverKey ? "KEBACA" : "KOSONG/UNDEFINED",
+    );
+    console.log(
+      "4. Awalan Key bener Sandbox?:",
+      serverKey?.startsWith("SB-Mid"),
+    );
+    console.log("======================");
     const response = await fetch(baseUrl, {
       method: "POST",
       headers: {
@@ -85,17 +98,20 @@ async function createMidtransSnapToken(
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Midtrans API error:", errorText);
-      return "";
+      return { token: "", redirectUrl: "" };
     }
 
     const data = (await response.json()) as {
       token?: string;
       redirect_url?: string;
     };
-    return data.token ?? "";
+    return {
+      token: data.token ?? "",
+      redirectUrl: data.redirect_url ?? "",
+    };
   } catch (error) {
     console.error("Failed to create Midtrans snap token:", error);
-    return "";
+    return { token: "", redirectUrl: "" };
   }
 }
 
@@ -103,6 +119,7 @@ export async function initiateTopUp(
   userId: string,
   input: TopUpInput,
 ): Promise<TopUpResult> {
+  // 1. Validasi Limit
   if (
     input.amount < WALLET_LIMITS.MIN_TOP_UP ||
     input.amount > WALLET_LIMITS.MAX_TOP_UP
@@ -113,81 +130,294 @@ export async function initiateTopUp(
     );
   }
 
-  if (input.idempotencyKey) {
-    const existing = await prisma.paymentTransaction.findUnique({
-      where: { idempotencyKey: input.idempotencyKey },
+  const orderId = generateOrderId(userId); // Generate di luar
+
+  // 2. Transaksi Database (Cepat & Aman, tanpa nungguin Midtrans)
+  const dbResult = await prisma.$transaction(async (tx) => {
+    // Idempotency check
+    if (input.idempotencyKey) {
+      const existing = await tx.paymentTransaction.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+      });
+
+      if (existing) {
+        if (existing.userId !== userId) {
+          throw new AppError(409, "Idempotency key conflict");
+        }
+        // Kalo request dobel, mending kita throw error aja biar frontend tau
+        throw new AppError(
+          400,
+          "Transaksi dengan Idempotency Key ini sudah diproses!",
+        );
+      }
+    }
+
+    // Get current user balance
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { walletBalance: true },
     });
 
-    if (existing) {
-      if (existing.userId !== userId) {
-        throw new AppError(409, "Idempotency key conflict");
-      }
+    if (!user) throw new AppError(404, "User not found");
 
-      if (existing.status === "COMPLETED") {
-        throw new AppError(409, "Transaction already completed");
-      }
+    // Bikin transaksi PENDING di database lu
+    const paymentTx = await tx.paymentTransaction.create({
+      data: {
+        userId,
+        externalId: orderId,
+        idempotencyKey: input.idempotencyKey ?? null,
+        amount: new Decimal(input.amount),
+        method: input.method,
+        status: "PENDING",
+        description: "Top Up Saldo",
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      },
+    });
 
-      return {
-        paymentId: existing.id,
-        orderId: existing.externalId,
-        snapToken: "",
-        amount: existing.amount.toNumber(),
-        expiresAt: existing.expiresAt!,
-      };
-    }
+    const transaction = await tx.transaction.create({
+      data: {
+        userId,
+        amount: input.amount,
+        type: "income",
+        category: "Top Up Saldo",
+        description: "Top Up Saldo (Pending)",
+      },
+    });
+
+    const walletTx = await tx.walletTransaction.create({
+      data: {
+        userId,
+        paymentTransactionId: paymentTx.id,
+        transactionId: transaction.id,
+        type: "TOP_UP",
+        amount: input.amount,
+        balanceBefore: user.walletBalance,
+        balanceAfter: user.walletBalance,
+        status: "PENDING",
+        description: "Top Up Saldo",
+        referenceId: orderId,
+        metadata: { method: input.method },
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        userId,
+        action: "TOP_UP_INITIATED",
+        entity: "WalletTransaction",
+        entityId: walletTx.id,
+        after: {
+          orderId,
+          amount: input.amount,
+          status: "PENDING",
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    return { paymentTx, walletTx };
+  }); // <--- Prisma Transaction SELESAI di sini. Database aman ga ke-lock.
+
+  // 3. Panggil API Midtrans (DI LUAR PRISMA TRANSACTION)
+  const { token, redirectUrl } = await createMidtransSnapToken(
+    orderId,
+    input.amount,
+  );
+
+  // 4. Kalo Midtrans gagal ngasih token, throw error biar keliatan di Postman
+  if (!token) {
+    throw new AppError(
+      500,
+      "Gagal mendapatkan token dari Midtrans. Cek terminal lu buat liat error aslinya!",
+    );
   }
 
-  const orderId = generateOrderId(userId);
-
-  const paymentTx = await prisma.paymentTransaction.create({
-    data: {
-      userId,
-      externalId: orderId,
-      idempotencyKey: input.idempotencyKey,
-      amount: new Decimal(input.amount),
-      method: input.method,
-      status: "PENDING",
-      description: "Top Up Saldo FinGrow Pay",
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-    },
-  });
-
-  const result = await processWalletTransaction({
-    userId,
-    type: "TOP_UP",
-    amount: input.amount,
-    description: "Top Up Saldo",
-    referenceId: orderId,
-    paymentTransactionId: paymentTx.id,
-    metadata: { method: input.method },
-    initialStatus: "PENDING",
-  });
-
-  const snapToken = await createMidtransSnapToken(orderId, input.amount);
-
+  // 5. Kalo sukses, return balasan ke user
   return {
-    paymentId: paymentTx.id,
+    paymentId: dbResult.paymentTx.id,
     orderId,
-    snapToken,
+    snapToken: token,
+    redirectUrl,
     amount: input.amount,
-    expiresAt: paymentTx.expiresAt!,
+    expiresAt: dbResult.paymentTx.expiresAt!,
+    status: "PENDING",
+    walletTransactionId: dbResult.walletTx.id,
   };
+}
+
+async function handleSuccessfulPayment(
+  paymentTx: {
+    id: string;
+    userId: string;
+    amount: Decimal;
+    externalId: string;
+  },
+  notification: MidtransNotification,
+): Promise<{ received: boolean; paymentId: string; status: string }> {
+  return await prisma.$transaction(async (tx) => {
+    const users = await tx.$queryRaw<{ id: string; walletBalance: number }[]>`
+      SELECT id, wallet_balance AS "walletBalance" FROM users WHERE id = ${paymentTx.userId} FOR UPDATE
+    `;
+
+    if (!users || users.length === 0) {
+      throw new AppError(404, "User not found");
+    }
+
+    const currentUser = users[0]!;
+
+    const walletTx = await tx.walletTransaction.findFirst({
+      where: { paymentTransactionId: paymentTx.id, deletedAt: null },
+    });
+
+    if (!walletTx) {
+      throw new AppError(404, "Wallet transaction not found");
+    }
+
+    if (walletTx.balanceBefore !== currentUser.walletBalance) {
+      console.warn(
+        `Balance mismatch for user ${paymentTx.userId}: expected ${walletTx.balanceBefore}, actual ${currentUser.walletBalance}`,
+      );
+    }
+
+    const newBalance = currentUser.walletBalance + paymentTx.amount.toNumber();
+
+    await tx.user.update({
+      where: { id: paymentTx.userId },
+      data: { walletBalance: newBalance },
+    });
+
+    await tx.walletTransaction.update({
+      where: { id: walletTx.id },
+      data: {
+        status: "COMPLETED",
+        balanceAfter: newBalance,
+      },
+    });
+
+    await tx.transaction.update({
+      where: { id: walletTx.transactionId },
+      data: { description: "Top Up Saldo" },
+    });
+
+    await tx.paymentTransaction.update({
+      where: { id: paymentTx.id },
+      data: {
+        status: "COMPLETED",
+        paidAt: new Date(),
+        webhookPayload: notification as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    // AuditLog
+    await tx.auditLog.create({
+      data: {
+        userId: paymentTx.userId,
+        action: "TOP_UP_COMPLETED",
+        entity: "WalletTransaction",
+        entityId: walletTx.id,
+        before: {
+          status: "PENDING",
+          balance: walletTx.balanceBefore,
+        } as Prisma.InputJsonValue,
+        after: {
+          status: "COMPLETED",
+          balance: newBalance,
+          orderId: paymentTx.externalId,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    return { received: true, paymentId: paymentTx.id, status: "COMPLETED" };
+  });
+}
+
+async function handleFailedPayment(
+  paymentTx: { id: string; userId: string; externalId: string },
+  notification: MidtransNotification,
+  mappedStatus: "FAILED" | "EXPIRED" | "CANCELLED",
+): Promise<{ received: boolean; paymentId: string; status: string }> {
+  return await prisma.$transaction(async (tx) => {
+    const walletTx = await tx.walletTransaction.findFirst({
+      where: { paymentTransactionId: paymentTx.id, deletedAt: null },
+    });
+
+    if (!walletTx) {
+      throw new AppError(404, "Wallet transaction not found");
+    }
+
+    const walletStatus =
+      mappedStatus === "EXPIRED" ? "CANCELLED" : mappedStatus;
+
+    await tx.walletTransaction.update({
+      where: { id: walletTx.id },
+      data: { status: walletStatus },
+    });
+
+    // Update Transaction description
+    await tx.transaction.update({
+      where: { id: walletTx.transactionId },
+      data: { description: `Top Up Saldo - ${mappedStatus}` },
+    });
+
+    // Update PaymentTransaction
+    await tx.paymentTransaction.update({
+      where: { id: paymentTx.id },
+      data: {
+        status: mappedStatus as PaymentStatus,
+        failureReason: notification.status_message ?? mappedStatus,
+        webhookPayload: notification as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    // AuditLog
+    await tx.auditLog.create({
+      data: {
+        userId: paymentTx.userId,
+        action: "TOP_UP_FAILED",
+        entity: "WalletTransaction",
+        entityId: walletTx.id,
+        before: { status: "PENDING" } as Prisma.InputJsonValue,
+        after: {
+          status: mappedStatus,
+          orderId: paymentTx.externalId,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    return { received: true, paymentId: paymentTx.id, status: mappedStatus };
+  });
 }
 
 export async function handleMidtransCallback(
   notification: MidtransNotification,
-): Promise<{ received: boolean; paymentId?: string; status?: string }> {
-  const isValid = verifyMidtransSignature(
-    notification.order_id,
-    notification.status_code,
-    notification.gross_amount,
-    notification.signature_key,
-  );
+  options?: { isSimulate?: boolean },
+): Promise<{
+  received: boolean;
+  paymentId?: string;
+  status?: string;
+  duplicate?: boolean;
+}> {
 
-  if (!isValid) {
-    throw new AppError(401, "Invalid signature");
+  console.log("=== DEBUG WEBHOOK MASUK ===");
+  console.log("ORDER ID:", notification.order_id);
+  console.log("STATUS CODE:", notification.status_code);
+  console.log("GROSS AMOUNT:", notification.gross_amount);
+  console.log("SIGNATURE DARI MIDTRANS:", notification.signature_key);
+  console.log("===========================");
+  if (options?.isSimulate !== true) {
+    // Verify signature for real Midtrans callbacks
+    const isValid = verifyMidtransSignature(
+      notification.order_id,
+      notification.status_code,
+      notification.gross_amount,
+      notification.signature_key,
+    );
+
+    if (!isValid) {
+      throw new AppError(401, "Invalid signature");
+    }
   }
 
+  // Find PaymentTransaction
   const paymentTx = await prisma.paymentTransaction.findUnique({
     where: { externalId: notification.order_id },
   });
@@ -196,11 +426,13 @@ export async function handleMidtransCallback(
     throw new AppError(404, "Payment not found");
   }
 
-  if (paymentTx.status === "COMPLETED") {
-    return { received: true, duplicate: true } as {
-      received: boolean;
-      paymentId?: string;
-      status?: string;
+  // IDEMPOTENCY CHECK - jika bukan PENDING/PROCESSING, return early
+  if (paymentTx.status !== "PENDING" && paymentTx.status !== "PROCESSING") {
+    return {
+      received: true,
+      duplicate: true,
+      paymentId: paymentTx.id,
+      status: paymentTx.status,
     };
   }
 
@@ -210,60 +442,57 @@ export async function handleMidtransCallback(
     ];
   const status = mappedStatus ?? "PROCESSING";
 
-  const walletTx = await prisma.walletTransaction.findFirst({
-    where: { paymentTransactionId: paymentTx.id, deletedAt: null },
-  });
+  // Handle berdasarkan status
+  if (status === "COMPLETED") {
+    return await handleSuccessfulPayment(paymentTx, notification);
+  } else if (["FAILED", "EXPIRED", "CANCELLED"].includes(status)) {
+    return await handleFailedPayment(
+      paymentTx,
+      notification,
+      status as "FAILED" | "EXPIRED" | "CANCELLED",
+    );
+  }
 
-  await prisma.$transaction(async (tx) => {
-    const updateData: Prisma.PaymentTransactionUpdateInput = {
-      status: status as PaymentStatus,
+  // PROCESSING - update PaymentTransaction status only
+  await prisma.paymentTransaction.update({
+    where: { id: paymentTx.id },
+    data: {
+      status: "PROCESSING",
       webhookPayload: notification as unknown as Prisma.InputJsonValue,
-    };
-
-    if (status === "COMPLETED") {
-      updateData.paidAt = new Date();
-    }
-
-    await tx.paymentTransaction.update({
-      where: { id: paymentTx.id },
-      data: updateData,
-    });
-
-    if (walletTx && status === "COMPLETED") {
-      await tx.walletTransaction.update({
-        where: { id: walletTx.id },
-        data: {
-          status: "COMPLETED",
-          balanceAfter: walletTx.balanceBefore + walletTx.amount,
-        },
-      });
-    } else if (
-      walletTx &&
-      (status === "FAILED" || status === "EXPIRED")
-    ) {
-      await tx.walletTransaction.update({
-        where: { id: walletTx.id },
-        data: { status: status === "EXPIRED" ? "CANCELLED" : status },
-      });
-    }
-
-    await tx.auditLog.create({
-      data: {
-        userId: paymentTx.userId,
-        action: "MIDTRANS_CALLBACK",
-        entity: "PaymentTransaction",
-        entityId: paymentTx.id,
-        before: { status: paymentTx.status } as Prisma.InputJsonValue,
-        after: {
-          status,
-          orderId: notification.order_id,
-          transactionStatus: notification.transaction_status,
-        } as Prisma.InputJsonValue,
-      },
-    });
+    },
   });
 
-  return { received: true, paymentId: paymentTx.id, status };
+  return { received: true, paymentId: paymentTx.id, status: "PROCESSING" };
+}
+
+export async function simulateWebhook(
+  orderId: string,
+  status: "success" | "failed",
+): Promise<{ received: boolean; paymentId?: string; status?: string }> {
+  if (env().NODE_ENV === "production") {
+    throw new AppError(403, "Simulate only available in development");
+  }
+
+  const paymentTx = await prisma.paymentTransaction.findUnique({
+    where: { externalId: orderId },
+  });
+
+  if (!paymentTx) {
+    throw new AppError(404, "Payment not found");
+  }
+
+  const notification: MidtransNotification = {
+    order_id: orderId,
+    transaction_status: status === "success" ? "settlement" : "deny",
+    status_code: status === "success" ? "200" : "500",
+    gross_amount: paymentTx.amount.toString(), // Use actual amount from database
+    signature_key: "simulate",
+    transaction_id: `SIM-${Date.now()}`,
+    payment_type: "simulation",
+    transaction_time: new Date().toISOString(),
+  };
+
+  return await handleMidtransCallback(notification, { isSimulate: true });
 }
 
 export { verifyMidtransSignature };

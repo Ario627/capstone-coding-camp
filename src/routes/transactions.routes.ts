@@ -49,9 +49,18 @@ transactionsRouter.get(
     const skip = (page - 1) * limit;
 
     const [total, items] = await Promise.all([
-      prisma.transaction.count({ where: { userId: req.user.sub, deletedAt: null } }),
-      prisma.transaction.findMany({
+      prisma.transaction.count({
         where: { userId: req.user.sub, deletedAt: null },
+      }),
+      prisma.transaction.findMany({
+        where: {
+          userId: req.user.sub,
+          deletedAt: null,
+          OR: [
+            { walletTransaction: null }, // Kalo manual, lolosin
+            { walletTransaction: { status: "COMPLETED" } }, // Kalo Midtrans, wajib COMPLETED
+          ],
+        },
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
@@ -83,7 +92,10 @@ transactionsRouter.get("/summary", authMiddleware, async (req, res) => {
   if (!req.user) throw new AppError(401, "Unauthorized");
 
   const transactions = await prisma.transaction.findMany({
-    where: { userId: req.user.sub, deletedAt: null },
+    where: { userId: req.user.sub, deletedAt: null, OR: [
+      {walletTransaction: null},
+      {walletTransaction: { status: "COMPLETED" }},
+    ] },
     select: { amount: true, type: true },
   });
 

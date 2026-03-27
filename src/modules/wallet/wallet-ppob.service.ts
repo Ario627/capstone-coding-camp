@@ -38,7 +38,9 @@ export async function processPPOB(
     select: { id: true, walletBalance: true },
   });
 
-  if (!user) throw new AppError(404, "user not found");
+  if (!user) {
+    throw new AppError(404, "User not found");
+  }
 
   if (user.walletBalance < input.amount) {
     throw new AppError(400, "Insufficient balance");

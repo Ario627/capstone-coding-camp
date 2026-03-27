@@ -346,7 +346,6 @@ export function walletCallbackRateLimit() {
     max: WALLET_RATE_LIMITS.CALLBACK_MAX_REQUESTS,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => req.ip ?? "unknown",
     ...(useRedisStore()
       ? {
           store: new RedisStore({

@@ -456,6 +456,8 @@ model WalletTransaction {
   status               WalletTransactionStatus @default(PENDING)
   description          String?
   referenceId          String?                 @map("reference_id")
+  paymentMethod        String?                 @map("payment_method")
+  paymentMethodName    String?                 @map("payment_method_name")
   metadata             Json?
   recipientUserId      String?                 @map("recipient_user_id")
   createdAt            DateTime                @default(now()) @map("created_at")

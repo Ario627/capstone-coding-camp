@@ -83,6 +83,9 @@ export interface WalletHistoryItem {
   balanceAfter: number;
   status: WalletTransactionStatus;
   description: string | null;
+  referenceId: string | null;
+  paymentMethod: string | null;
+  paymentMethodName: string | null;
   createdAt: Date;
 }
 
@@ -95,6 +98,22 @@ export interface WalletHistoryQuery {
   endDate?: Date;
 }
 
+export interface WalletTransactionDetail {
+  transactionId: string;
+  referenceId: string | null;
+  type: WalletTransactionType;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  status: WalletTransactionStatus;
+  description: string | null;
+  paymentMethod: string | null;
+  paymentMethodName: string | null;
+  recipientUserId?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: Date;
+}
+
 export interface MidtransNotification {
   order_id: string;
   status_code: string;
@@ -105,6 +124,12 @@ export interface MidtransNotification {
   transaction_time: string;
   payment_type: string;
   fraud_status?: string;
+  va_numbers?: Array<{ bank: string; va_number: string }>;
+  bill_key?: string;
+  biller_code?: string;
+  issuer?: string;
+  store?: string;
+  bank?: string;
   [key: string]: unknown;
 }
 
@@ -122,4 +147,9 @@ export interface PPOBProduct {
   fee: number;
   minAmount: number;
   maxAmount: number;
+}
+
+export interface PaymentMethodInfo {
+  paymentMethod: string;
+  paymentMethodName: string;
 }

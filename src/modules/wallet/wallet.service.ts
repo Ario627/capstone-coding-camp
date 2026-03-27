@@ -5,22 +5,14 @@ import type {
   WalletTransactionType,
   WalletTransactionStatus,
 } from "@prisma/client";
+import type {
+  WalletTransactionDetail,
+  WalletHistoryItem,
+} from "./wallet.types.js";
 
 export interface WalletBalanceResult {
   balance: number;
   currency: string;
-}
-
-export interface WalletHistoryItem {
-  id: string;
-  type: WalletTransactionType;
-  amount: number;
-  balanceBefore: number;
-  balanceAfter: number;
-  status: WalletTransactionStatus;
-  description: string | null;
-  referenceId: string | null;
-  createdAt: Date;
 }
 
 export interface WalletHistoryResult {
@@ -109,6 +101,8 @@ export async function getWalletHistory(
         status: true,
         description: true,
         referenceId: true,
+        paymentMethod: true,
+        paymentMethodName: true,
         createdAt: true,
       },
     }),
@@ -118,19 +112,14 @@ export async function getWalletHistory(
     page,
     limit,
     total,
-    items,
+    items: items as WalletHistoryItem[],
   };
 }
 
 export async function getWalletTransactionById(
   userId: string,
   transactionId: string,
-): Promise<
-  WalletHistoryItem & {
-    recipientUserId?: string | null;
-    metadata?: Record<string, unknown> | null;
-  }
-> {
+): Promise<WalletTransactionDetail> {
   const transaction = await prisma.walletTransaction.findFirst({
     where: {
       id: transactionId,
@@ -146,6 +135,8 @@ export async function getWalletTransactionById(
       status: true,
       description: true,
       referenceId: true,
+      paymentMethod: true,
+      paymentMethodName: true,
       recipientUserId: true,
       metadata: true,
       createdAt: true,
@@ -157,8 +148,19 @@ export async function getWalletTransactionById(
   }
 
   return {
-    ...transaction,
+    transactionId: transaction.id,
+    referenceId: transaction.referenceId,
+    type: transaction.type,
+    amount: transaction.amount,
+    balanceBefore: transaction.balanceBefore,
+    balanceAfter: transaction.balanceAfter,
+    status: transaction.status,
+    description: transaction.description,
+    paymentMethod: transaction.paymentMethod,
+    paymentMethodName: transaction.paymentMethodName,
+    recipientUserId: transaction.recipientUserId,
     metadata: transaction.metadata as Record<string, unknown> | null,
+    createdAt: transaction.createdAt,
   };
 }
 

@@ -7,6 +7,7 @@ import { AppError } from "../../common/middleware/error-handler.middleware.js";
 import {
   WALLET_LIMITS,
   MIDTRANS_TRANSACTION_STATUS_MAP,
+  extractPaymentMethodInfo,
 } from "./wallet.constant.js";
 import type {
   TopUpInput,
@@ -28,24 +29,20 @@ function verifyMidtransSignature(
   receivedSignature: string,
 ): boolean {
   const serverKey = env().MIDTRANS_SERVER_KEY;
-
   const expectedSignature = createHash("sha512")
     .update(orderId + statusCode + grossAmount + serverKey)
-    .digest("hex"); 
+    .digest("hex");
 
-  console.log("expectedSignature:", expectedSignature);
+  console.log("Verifying Midtrans signature:");
+  console.log("Expected signature:", expectedSignature);
+  console.log("Received signature:", receivedSignature);
+
   try {
     const received = Buffer.from(receivedSignature, "utf-8");
-    const expected = Buffer.from(expectedSignature, "utf-8"); 
-
-    console.log("\nreceivedSignature:", receivedSignature);
-    console.log("received:", received);
-    console.log("expected:", expected);
-
+    const expected = Buffer.from(expectedSignature, "utf-8");
     if (received.length !== expected.length) return false;
     return timingSafeEqual(received, expected);
-  } catch (error) {
-    console.error("ERROR DI SIGNATURE:", error);
+  } catch {
     return false;
   }
 }
@@ -74,18 +71,6 @@ async function createMidtransSnapToken(
     : "https://app.sandbox.midtrans.com/snap/v1/transactions";
 
   try {
-    console.log("=== DEBUG MIDTRANS ===");
-    console.log("1. isProduction:", isProduction);
-    console.log("2. Base URL:", baseUrl);
-    console.log(
-      "3. Server Key kebaca ga?:",
-      serverKey ? "KEBACA" : "KOSONG/UNDEFINED",
-    );
-    console.log(
-      "4. Awalan Key bener Sandbox?:",
-      serverKey?.startsWith("SB-Mid"),
-    );
-    console.log("======================");
     const response = await fetch(baseUrl, {
       method: "POST",
       headers: {
@@ -119,7 +104,6 @@ export async function initiateTopUp(
   userId: string,
   input: TopUpInput,
 ): Promise<TopUpResult> {
-  // 1. Validasi Limit
   if (
     input.amount < WALLET_LIMITS.MIN_TOP_UP ||
     input.amount > WALLET_LIMITS.MAX_TOP_UP
@@ -130,11 +114,9 @@ export async function initiateTopUp(
     );
   }
 
-  const orderId = generateOrderId(userId); // Generate di luar
+  const orderId = generateOrderId(userId);
 
-  // 2. Transaksi Database (Cepat & Aman, tanpa nungguin Midtrans)
   const dbResult = await prisma.$transaction(async (tx) => {
-    // Idempotency check
     if (input.idempotencyKey) {
       const existing = await tx.paymentTransaction.findUnique({
         where: { idempotencyKey: input.idempotencyKey },
@@ -144,7 +126,6 @@ export async function initiateTopUp(
         if (existing.userId !== userId) {
           throw new AppError(409, "Idempotency key conflict");
         }
-        // Kalo request dobel, mending kita throw error aja biar frontend tau
         throw new AppError(
           400,
           "Transaksi dengan Idempotency Key ini sudah diproses!",
@@ -152,7 +133,6 @@ export async function initiateTopUp(
       }
     }
 
-    // Get current user balance
     const user = await tx.user.findUnique({
       where: { id: userId },
       select: { walletBalance: true },
@@ -160,7 +140,6 @@ export async function initiateTopUp(
 
     if (!user) throw new AppError(404, "User not found");
 
-    // Bikin transaksi PENDING di database lu
     const paymentTx = await tx.paymentTransaction.create({
       data: {
         userId,
@@ -215,23 +194,20 @@ export async function initiateTopUp(
     });
 
     return { paymentTx, walletTx };
-  }); // <--- Prisma Transaction SELESAI di sini. Database aman ga ke-lock.
+  });
 
-  // 3. Panggil API Midtrans (DI LUAR PRISMA TRANSACTION)
   const { token, redirectUrl } = await createMidtransSnapToken(
     orderId,
     input.amount,
   );
 
-  // 4. Kalo Midtrans gagal ngasih token, throw error biar keliatan di Postman
   if (!token) {
     throw new AppError(
       500,
-      "Gagal mendapatkan token dari Midtrans. Cek terminal lu buat liat error aslinya!",
+      "Gagal mendapatkan token dari Midtrans. Cek terminal untuk detail error!",
     );
   }
 
-  // 5. Kalo sukses, return balasan ke user
   return {
     paymentId: dbResult.paymentTx.id,
     orderId,
@@ -253,6 +229,8 @@ async function handleSuccessfulPayment(
   },
   notification: MidtransNotification,
 ): Promise<{ received: boolean; paymentId: string; status: string }> {
+  const paymentMethodInfo = extractPaymentMethodInfo(notification);
+
   return await prisma.$transaction(async (tx) => {
     const users = await tx.$queryRaw<{ id: string; walletBalance: number }[]>`
       SELECT id, wallet_balance AS "walletBalance" FROM users WHERE id = ${paymentTx.userId} FOR UPDATE
@@ -290,6 +268,8 @@ async function handleSuccessfulPayment(
       data: {
         status: "COMPLETED",
         balanceAfter: newBalance,
+        paymentMethod: paymentMethodInfo.paymentMethod,
+        paymentMethodName: paymentMethodInfo.paymentMethodName,
       },
     });
 
@@ -307,7 +287,6 @@ async function handleSuccessfulPayment(
       },
     });
 
-    // AuditLog
     await tx.auditLog.create({
       data: {
         userId: paymentTx.userId,
@@ -322,6 +301,7 @@ async function handleSuccessfulPayment(
           status: "COMPLETED",
           balance: newBalance,
           orderId: paymentTx.externalId,
+          paymentMethod: paymentMethodInfo.paymentMethod,
         } as Prisma.InputJsonValue,
       },
     });
@@ -352,13 +332,11 @@ async function handleFailedPayment(
       data: { status: walletStatus },
     });
 
-    // Update Transaction description
     await tx.transaction.update({
       where: { id: walletTx.transactionId },
       data: { description: `Top Up Saldo - ${mappedStatus}` },
     });
 
-    // Update PaymentTransaction
     await tx.paymentTransaction.update({
       where: { id: paymentTx.id },
       data: {
@@ -368,7 +346,6 @@ async function handleFailedPayment(
       },
     });
 
-    // AuditLog
     await tx.auditLog.create({
       data: {
         userId: paymentTx.userId,
@@ -396,15 +373,7 @@ export async function handleMidtransCallback(
   status?: string;
   duplicate?: boolean;
 }> {
-
-  console.log("=== DEBUG WEBHOOK MASUK ===");
-  console.log("ORDER ID:", notification.order_id);
-  console.log("STATUS CODE:", notification.status_code);
-  console.log("GROSS AMOUNT:", notification.gross_amount);
-  console.log("SIGNATURE DARI MIDTRANS:", notification.signature_key);
-  console.log("===========================");
   if (options?.isSimulate !== true) {
-    // Verify signature for real Midtrans callbacks
     const isValid = verifyMidtransSignature(
       notification.order_id,
       notification.status_code,
@@ -417,7 +386,6 @@ export async function handleMidtransCallback(
     }
   }
 
-  // Find PaymentTransaction
   const paymentTx = await prisma.paymentTransaction.findUnique({
     where: { externalId: notification.order_id },
   });
@@ -426,7 +394,6 @@ export async function handleMidtransCallback(
     throw new AppError(404, "Payment not found");
   }
 
-  // IDEMPOTENCY CHECK - jika bukan PENDING/PROCESSING, return early
   if (paymentTx.status !== "PENDING" && paymentTx.status !== "PROCESSING") {
     return {
       received: true,
@@ -442,7 +409,6 @@ export async function handleMidtransCallback(
     ];
   const status = mappedStatus ?? "PROCESSING";
 
-  // Handle berdasarkan status
   if (status === "COMPLETED") {
     return await handleSuccessfulPayment(paymentTx, notification);
   } else if (["FAILED", "EXPIRED", "CANCELLED"].includes(status)) {
@@ -453,7 +419,6 @@ export async function handleMidtransCallback(
     );
   }
 
-  // PROCESSING - update PaymentTransaction status only
   await prisma.paymentTransaction.update({
     where: { id: paymentTx.id },
     data: {
@@ -485,11 +450,12 @@ export async function simulateWebhook(
     order_id: orderId,
     transaction_status: status === "success" ? "settlement" : "deny",
     status_code: status === "success" ? "200" : "500",
-    gross_amount: paymentTx.amount.toString(), // Use actual amount from database
+    gross_amount: paymentTx.amount.toString(),
     signature_key: "simulate",
     transaction_id: `SIM-${Date.now()}`,
     payment_type: "simulation",
     transaction_time: new Date().toISOString(),
+    status_message: status === "success" ? "Success" : "Failed",
   };
 
   return await handleMidtransCallback(notification, { isSimulate: true });

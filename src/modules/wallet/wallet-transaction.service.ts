@@ -37,7 +37,7 @@ export async function processWalletTransaction(
 
   return await prisma.$transaction(async (tx) => {
     const users = await tx.$queryRaw<{ id: string; walletBalance: number }[]>`
-      SELECT id, wallet_balance FROM users WHERE id = ${input.userId} FOR UPDATE
+      SELECT id, wallet_balance AS "walletBalance" FROM users WHERE id = ${input.userId} FOR UPDATE
     `;
 
     if (!users || users.length === 0) {

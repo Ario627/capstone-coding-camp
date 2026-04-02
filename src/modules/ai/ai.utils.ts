@@ -115,7 +115,3 @@ export async function generateContent(options: GenerateOptions): Promise<Generat
     }
 }
 
-export function buildConversationPrompt(
-    systemPrompt: string,
-    history: Array
-)

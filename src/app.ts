@@ -21,11 +21,12 @@ export function createApp() {
 
   app.disable("x-powered-by");
   app.use(helmet());
+  app.use((helmet as any).default ? (helmet as any).default() : (helmet as any)());    
   app.use(
     cors({
       origin: env().FRONTEND_URL,
       credentials: true,
-    }),
+    })  
   );
   app.use(cookieParser());
   app.use(express.json({ limit: "10kb" }));

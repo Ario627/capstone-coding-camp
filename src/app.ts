@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import * as helmet from "helmet";
+import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { env } from "./config/env.config.js";
 import { generalRateLimit } from "./common/middleware/rate-limit.middleware.js";

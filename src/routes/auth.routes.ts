@@ -18,20 +18,23 @@ function setRefreshTokenCookie(res: import("express").Response, token: string): 
   
   res.cookie(COOKIE_REFRESH_TOKEN, token, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "strict" : "lax",
+    secure: true,
+    sameSite: "none",
     path: "/",
-    maxAge: 7 * 86_400_000,
+    maxAge: 24 * 60 * 60 * 1000,
   });
 }
 
-function setCsrfCookie(res: import("express").Response, cookieValue: string): void {
+function setCsrfCookie(
+  res: import("express").Response,
+  cookieValue: string,
+): void {
   const isProduction = env().NODE_ENV === "production";
-  
+
   res.cookie(COOKIE_CSRF, cookieValue, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "strict" : "lax",
+    secure: true,
+    sameSite: "none",
     path: "/",
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   });

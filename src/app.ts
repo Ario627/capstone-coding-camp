@@ -20,7 +20,8 @@ export function createApp() {
   const app = express();
 
   app.disable("x-powered-by");
-  app.use((helmet as any).default ? (helmet as any).default() : (helmet as any)());    
+  ///@ts-ignore
+  app.use(helmet());
   app.use(
     cors({
       origin: env().FRONTEND_URL,

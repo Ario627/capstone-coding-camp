@@ -19,6 +19,7 @@ import { walletRouter } from "./routes/wallet.routes.js";
 export function createApp() {
   const app = express();
 
+  app.set("trust proxy", 1);
   app.disable("x-powered-by");
   ///@ts-ignore
   app.use(helmet());
@@ -26,7 +27,7 @@ export function createApp() {
     cors({
       origin: env().FRONTEND_URL,
       credentials: true,
-    })  
+    }),
   );
   app.use(cookieParser());
   app.use(express.json({ limit: "10kb" }));
@@ -44,7 +45,6 @@ export function createApp() {
   app.use("/api/ai", csrfMiddleware, aiRouter);
   app.use("/api/consultant", csrfMiddleware, consultantRouter);
   app.use("/api/umkm", csrfMiddleware, umkmRouter);
-  
 
   app.use(errorHandler);
   return app;

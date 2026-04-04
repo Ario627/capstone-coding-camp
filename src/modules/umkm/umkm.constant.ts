@@ -65,7 +65,7 @@ export const STOCK_MOVEMENT_TYPES = {
 } as const;
 
 export const BUSINESS_LIMITS = {
-  NAME_MIN: 1,
+  NAME_MIN: 2,
   NAME_MAX: 200,
   DESCRIPTION_MAX: 2000,
   ADDRESS_MAX: 500,

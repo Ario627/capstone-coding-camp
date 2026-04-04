@@ -29,7 +29,7 @@ export const createBusinessSchema = z
   .object({
     name: z
       .string()
-      .min(BUSINESS_LIMITS.NAME_MIN, "Nama bisnis wajib diisi")
+      .min(BUSINESS_LIMITS.NAME_MIN, `Nama bisnis minimal ${BUSINESS_LIMITS.NAME_MIN} karakter`)
       .max(
         BUSINESS_LIMITS.NAME_MAX,
         `Nama bisnis maksimal ${BUSINESS_LIMITS.NAME_MAX} karakter`,
@@ -37,7 +37,7 @@ export const createBusinessSchema = z
       .trim(),
     type: z
       .string()
-      .min(1, "Tipe bisnis wajib diisi")
+      .min(2, "Tipe bisnis minimal 2 karakter")
       .max(100, "Tipe bisnis maksimal 100 karakter")
       .trim(),
     description: z

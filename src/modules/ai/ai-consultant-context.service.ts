@@ -277,9 +277,9 @@ export function formatContextForPrompt(context: UserFinancialContext): string {
   // Summary
   lines.push('');
   lines.push(`**Ringkasan (${context.financialSummary.period}):**`);
-  lines.push(`- Total Pemasukan: Rp ${context.financialSummary.totalIncome.toLocaleString('id-ID')}`);
-  lines.push(`- Total Pengeluaran: Rp ${context.financialSummary.totalExpense.toLocaleString('id-ID')}`);
-  lines.push(`- Saldo: Rp ${context.financialSummary.balance.toLocaleString('id-ID')}`);
+  lines.push(`- Total Pemasukan: Rp${context.financialSummary.totalIncome.toLocaleString('id-ID')}`);
+  lines.push(`- Total Pengeluaran: Rp${context.financialSummary.totalExpense.toLocaleString('id-ID')}`);
+  lines.push(`- Saldo: Rp${context.financialSummary.balance.toLocaleString('id-ID')}`);
   lines.push(`- Rasio Tabungan: ${context.financialSummary.savingsRate.toFixed(1)}%`);
   lines.push(`- Jumlah Transaksi: ${context.financialSummary.transactionCount}`);
   
@@ -288,7 +288,7 @@ export function formatContextForPrompt(context: UserFinancialContext): string {
     lines.push('');
     lines.push(`**Pengeluaran per Kategori:**`);
     for (const cat of context.categoryBreakdown.expense.slice(0, 5)) {
-      lines.push(`- ${cat.category}: Rp ${cat.amount.toLocaleString('id-ID')} (${cat.percentage.toFixed(1)}%)`);
+      lines.push(`- ${cat.category}: Rp${cat.amount.toLocaleString('id-ID')} (${cat.percentage.toFixed(1)}%)`);
     }
   }
   
@@ -297,7 +297,7 @@ export function formatContextForPrompt(context: UserFinancialContext): string {
     lines.push('');
     lines.push(`**Tren Bulanan (3 bulan terakhir):**`);
     for (const month of context.monthlyTrend.slice(-3)) {
-      lines.push(`- ${month}: Masuk Rp ${month.income.toLocaleString('id-ID')} | Keluar Rp ${month.expense.toLocaleString('id-ID')} | Saldo Rp ${month.balance.toLocaleString('id-ID')}`);
+      lines.push(`- ${month}: Masuk Rp${month.income.toLocaleString('id-ID')} | Keluar Rp${month.expense.toLocaleString('id-ID')} | Saldo Rp${month.balance.toLocaleString('id-ID')}`);
     }
   }
   
@@ -307,7 +307,7 @@ export function formatContextForPrompt(context: UserFinancialContext): string {
     lines.push(`**Transaksi Terakhir (5 terakhir):**`);
     for (const tx of context.recentTransactions.slice(0, 5)) {
       const sign = tx.type === 'income' ? '+' : '-';
-      lines.push(`- ${tx.date.toLocaleDateString('id-ID')}: ${sign}Rp ${tx.amount.toLocaleString('id-ID')} (${tx.category}) - ${tx.description}`);
+      lines.push(`- ${tx.date.toLocaleDateString('id-ID')}: ${sign}Rp${tx.amount.toLocaleString('id-ID')} (${tx.category}) - ${tx.description}`);
     }
   }
   

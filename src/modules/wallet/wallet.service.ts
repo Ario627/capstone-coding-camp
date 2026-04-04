@@ -122,9 +122,12 @@ export async function getWalletTransactionById(
 ): Promise<WalletTransactionDetail> {
   const transaction = await prisma.walletTransaction.findFirst({
     where: {
-      id: transactionId,
       userId,
       deletedAt: null,
+      OR: [
+        { id: transactionId }, 
+        { referenceId: transactionId },
+      ],
     },
     select: {
       id: true,

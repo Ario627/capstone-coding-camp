@@ -58,6 +58,7 @@ model User {
   id                  String               @id @default(cuid())
   email               String               @unique
   passwordHash        String
+  fullName            String?              @map("full_name")
   role                UserRole             @default(user)
   isActive            Boolean              @default(true) @map("is_active")
   lastLoginAt         DateTime?            @map("last_login_at")

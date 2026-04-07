@@ -347,3 +347,12 @@ export const WALLET_TRANSACTION_CATEGORY_MAP: Record<string, string> = {
   WITHDRAWAL: "Penarikan Saldo",
   REFUND: "Refund",
 };
+
+export const PROFILE_RATE_LIMITS = {
+  READ_WINDOW_MS: 60_000,
+  READ_MAX_REQUESTS: 30,
+  WRITE_WINDOW_MS: 60_000,
+  WRITE_MAX_REQUESTS: 10,
+  PASSWORD_WINDOW_MS: 1_800_000,
+  PASSWORD_MAX_REQUESTS: 3,
+} as const;

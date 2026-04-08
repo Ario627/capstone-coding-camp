@@ -33,6 +33,8 @@ export interface PPOBResult {
   productCode: string;
   targetNumber: string;
   amount: number;
+  baseAmount: number;
+  adminFee: number;
   status: WalletTransactionStatus;
   message: string;
 }

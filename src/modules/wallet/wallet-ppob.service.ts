@@ -29,8 +29,15 @@ export async function processPPOB(
     throw new AppError(404, "Product not found");
   }
 
-  if (input.amount !== product.amount) {
-    throw new AppError(400, `Amount must be ${product.amount}`);
+  const baseAmount = product.amount;
+  const adminFee = product.fee;
+  const totalAmount = baseAmount + adminFee;
+
+  if (input.amount !== totalAmount) {
+    throw new AppError(
+      400,
+      `Total pembayaran harus ${totalAmount} (nominal ${baseAmount} + biaya admin ${adminFee})`,
+    );
   }
 
   const user = await prisma.user.findUnique({
@@ -42,14 +49,17 @@ export async function processPPOB(
     throw new AppError(404, "User not found");
   }
 
-  if (user.walletBalance < input.amount) {
-    throw new AppError(400, "Insufficient balance");
+  if (user.walletBalance < totalAmount) {
+    throw new AppError(
+      400,
+      `Saldo tidak mencukupi. Saldo: ${user.walletBalance}, Total: ${totalAmount}`,
+    );
   }
 
   const result = await processWalletTransaction({
     userId,
     type: "PPOB",
-    amount: input.amount,
+    amount: totalAmount,
     description: `${product.name} - ${input.targetNumber}`,
     metadata: {
       productCode: input.productCode,
@@ -57,6 +67,9 @@ export async function processPPOB(
       targetNumber: input.targetNumber,
       provider: product.provider,
       category: product.category,
+      baseAmount,
+      adminFee,
+      totalAmount,
     },
   });
 
@@ -67,7 +80,9 @@ export async function processPPOB(
     receiptNumber,
     productCode: input.productCode,
     targetNumber: input.targetNumber,
-    amount: input.amount,
+    amount: totalAmount,
+    baseAmount,
+    adminFee,
     status: "COMPLETED",
     message: `Pembayaran ${product.name} berhasil`,
   };

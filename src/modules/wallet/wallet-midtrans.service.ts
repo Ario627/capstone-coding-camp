@@ -33,10 +33,6 @@ function verifyMidtransSignature(
     .update(orderId + statusCode + grossAmount + serverKey)
     .digest("hex");
 
-  console.log("Verifying Midtrans signature:");
-  console.log("Expected signature:", expectedSignature);
-  console.log("Received signature:", receivedSignature);
-
   try {
     const received = Buffer.from(receivedSignature, "utf-8");
     const expected = Buffer.from(expectedSignature, "utf-8");
@@ -50,16 +46,53 @@ function verifyMidtransSignature(
 async function createMidtransSnapToken(
   orderId: string,
   amount: number,
+  userId: string,
 ): Promise<{ token: string; redirectUrl: string }> {
   const isProduction = env().MIDTRANS_IS_PRODUCTION;
   const serverKey = env().MIDTRANS_SERVER_KEY;
   const authString = Buffer.from(serverKey + ":").toString("base64");
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, fullName: true },
+  });
+
+  const userName =
+    user?.fullName || user?.email?.split("@")[0] || "FinGrow User";
+  const userEmail = user?.email || "user@fingrow.id";
 
   const requestBody = {
     transaction_details: {
       order_id: orderId,
       gross_amount: amount,
     },
+    item_details: [
+      {
+        id: `TOPUP-${orderId}`,
+        price: amount,
+        quantity: 1,
+        name: "Top Up Saldo FinGrow",
+        category: "TOP_UP",
+        merchant_name: "FinGrow",
+      },
+    ],
+    customer_details: {
+      first_name: userName.split(" ")[0] || "User",
+      last_name: userName.split(" ").slice(1).join(" ") || "",
+      email: userEmail,
+    },
+    enabled_payments: [
+      "bank_transfer",
+      "bca_va",
+      "bni_va",
+      "bri_va",
+      "mandiri_va",
+      "echannel",
+      "gopay",
+      "shopeepay",
+      "qris",
+      "dana",
+    ],
     callbacks: {
       finish: `${env().FRONTEND_URL}/wallet/top-up/finish`,
       error: `${env().FRONTEND_URL}/wallet/top-up/error`,
@@ -199,6 +232,7 @@ export async function initiateTopUp(
   const { token, redirectUrl } = await createMidtransSnapToken(
     orderId,
     input.amount,
+    userId,
   );
 
   if (!token) {

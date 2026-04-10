@@ -41,6 +41,7 @@ enum WalletTransactionType {
   TRANSFER_OUT 
   WITHDRAWAL   
   REFUND       
+  PAYMENT
 }
 
 enum WalletTransactionStatus {
@@ -479,3 +480,4 @@ model WalletTransaction {
   @@index([deletedAt])
   @@map("wallet_transactions")
 }
+

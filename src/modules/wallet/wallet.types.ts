@@ -155,3 +155,48 @@ export interface PaymentMethodInfo {
   paymentMethod: string;
   paymentMethodName: string;
 }
+
+export interface QRISPaymentInput {
+  qrData: string;
+  amount: number;
+  merchantName: string;
+  merchantId: string;
+}
+
+export interface QRISPaymentResult {
+  transactionId: string;
+  walletTransactionId: string;
+  amount: number;
+  merchantName: string;
+  merchantId: string;
+  receiptNumber: string;
+  status: "COMPLETED";
+  message: string;
+}
+
+export interface BankTransferInput {
+  bankCode: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  amount: number;
+  note?: string;
+}
+
+export interface BankTransferResult {
+  transactionId: string;
+  walletTransactionId: string;
+  amount: number;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  receiptNumber: string;
+  status: "COMPLETED";
+  message: string;
+}
+
+export interface UserLookupResult {
+  id: string;
+  fullName: string | null;
+  email: string;
+}

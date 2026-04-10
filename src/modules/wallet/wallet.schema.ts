@@ -34,12 +34,15 @@ export const topUpSchema = z
 
 export const ppobSchema = z
   .object({
-    productCode: z.string().min(1).max(50),
+    productCode: z.string().min(1, "Kode produk wajib diisi").max(50),
     targetNumber: z
       .string()
-      .min(10, "Nomor target minimal 10 digit")
-      .max(20, "Nomor target maksimal 20 digit")
-      .regex(/^[0-9]+$/, "Nomor target hanya boleh angka"),
+      .min(1, "Nomor target wajib diisi")
+      .max(50, "Nomor target maksimal 50 karakter")
+      .regex(
+        /^[a-zA-Z0-9\s\-_.]+$/,
+        "Nomor target hanya boleh berisi huruf, angka, spasi, tanda hubung, dan titik",
+      ),
     amount: z
       .number()
       .int("Amount must be integer")
@@ -72,6 +75,54 @@ export const transferSchema = z
   })
   .strict();
 
+export const lookupQuerySchema = z.object({
+  identifier: z
+    .string()
+    .min(1, "Email wajib diisi")
+    .max(255)
+    .email("Format email tidak valid"),
+});
+
+export const qrisPaymentSchema = z
+  .object({
+    qrData: z.string().min(1, "Data QR wajib diisi").max(2000),
+    amount: z
+      .number()
+      .int("Amount must be integer")
+      .min(
+        WALLET_LIMITS.MIN_TRANSACTION,
+        `Minimal pembayaran Rp ${WALLET_LIMITS.MIN_TRANSACTION.toLocaleString("id-ID")}`,
+      )
+      .max(
+        WALLET_LIMITS.MAX_TRANSACTION,
+        `Maksimal pembayaran Rp ${WALLET_LIMITS.MAX_TRANSACTION.toLocaleString("id-ID")}`,
+      ),
+    merchantName: z.string().min(1, "Nama merchant wajib diisi").max(200),
+    merchantId: z.string().min(1, "ID merchant wajib diisi").max(100),
+  })
+  .strict();
+
+export const bankTransferSchema = z
+  .object({
+    bankCode: z.string().min(1).max(20),
+    bankName: z.string().min(1).max(100),
+    accountNumber: z.string().min(1, "Nomor rekening wajib diisi").max(50),
+    accountName: z.string().min(1, "Nama penerima wajib diisi").max(200),
+    amount: z
+      .number()
+      .int("Amount must be integer")
+      .min(
+        WALLET_LIMITS.MIN_TRANSACTION,
+        `Minimal transfer Rp ${WALLET_LIMITS.MIN_TRANSACTION.toLocaleString("id-ID")}`,
+      )
+      .max(
+        WALLET_LIMITS.MAX_TRANSACTION,
+        `Maksimal transfer Rp ${WALLET_LIMITS.MAX_TRANSACTION.toLocaleString("id-ID")}`,
+      ),
+    note: z.string().max(200).optional(),
+  })
+  .strict();
+
 export const historyQuerySchema = z
   .object({
     page: z.coerce.number().int().positive().default(1),
@@ -84,6 +135,7 @@ export const historyQuerySchema = z
         "TRANSFER_OUT",
         "WITHDRAWAL",
         "REFUND",
+        "PAYMENT",
       ])
       .optional(),
     status: z
@@ -109,3 +161,6 @@ export type TopUpInput = z.infer<typeof topUpSchema>;
 export type PPOBInput = z.infer<typeof ppobSchema>;
 export type TransferInputSchema = z.infer<typeof transferSchema>;
 export type HistoryQueryInput = z.infer<typeof historyQuerySchema>;
+export type LookupQueryInput = z.infer<typeof lookupQuerySchema>;
+export type QRISPaymentInputSchema = z.infer<typeof qrisPaymentSchema>;
+export type BankTransferInputSchema = z.infer<typeof bankTransferSchema>;

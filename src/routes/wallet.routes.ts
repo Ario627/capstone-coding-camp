@@ -33,6 +33,17 @@ import {
   getPPOBProducts,
 } from "../modules/wallet/wallet-ppob.service.js";
 
+import {
+  processQRISPayment,
+  processBankTransfer,
+} from "../modules/wallet/wallet-qris.service.js";
+import { lookupUser } from "../modules/wallet/wallet-transfer.service.js";
+import {
+  lookupQuerySchema,
+  qrisPaymentSchema,
+  bankTransferSchema,
+} from "../modules/wallet/wallet.schema.js";
+
 export const walletRouter = Router();
 
 // GET /api/wallet/balance
@@ -174,6 +185,53 @@ walletRouter.post(
       note: req.body.note,
     });
 
+    sendSuccess(res, result);
+  },
+);
+
+
+
+// GET /api/wallet/lookup
+walletRouter.get(
+  "/lookup",
+  authMiddleware,
+  walletReadRateLimit(),
+  validate({ query: lookupQuerySchema }),
+  async (req, res) => {
+    if (!req.user) throw new AppError(401, "Unauthorized");
+
+    const query = req.validated?.query ?? lookupQuerySchema.parse(req.query);
+    const result = await lookupUser(query.identifier);
+    sendSuccess(res, result);
+  },
+);
+
+// POST /api/wallet/qris/pay
+walletRouter.post(
+  "/qris/pay",
+  authMiddleware,
+  csrfMiddleware,
+  walletWriteRateLimit(),
+  validate({ body: qrisPaymentSchema }),
+  async (req, res) => {
+    if (!req.user) throw new AppError(401, "Unauthorized");
+
+    const result = await processQRISPayment(req.user.sub, req.body);
+    sendSuccess(res, result);
+  },
+);
+
+// POST /api/wallet/bank-transfer
+walletRouter.post(
+  "/bank-transfer",
+  authMiddleware,
+  csrfMiddleware,
+  walletWriteRateLimit(),
+  validate({ body: bankTransferSchema }),
+  async (req, res) => {
+    if (!req.user) throw new AppError(401, "Unauthorized");
+
+    const result = await processBankTransfer(req.user.sub, req.body);
     sendSuccess(res, result);
   },
 );
